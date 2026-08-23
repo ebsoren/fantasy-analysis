@@ -309,6 +309,11 @@ tr.keeper .name-cell { font-style: italic; }
 
 <div class="header">
   <h1>PPR Draft Board</h1>
+  <div style="display:flex;gap:4px">
+    <button class="chip active comp-base" data-base="ds">DraftSharks</button>
+    <button class="chip comp-base" data-base="boone">Boone</button>
+    <button class="chip comp-base" data-base="ciely">Ciely</button>
+  </div>
   <span class="stats" id="stats"></span>
 </div>
 
@@ -332,23 +337,7 @@ tr.keeper .name-cell { font-style: italic; }
   </div>
   <div class="table-wrap">
     <table>
-      <thead>
-        <tr>
-          <th style="width:36px">#</th>
-          <th style="width:40px">Adj</th>
-          <th style="width:84px"></th>
-          <th>Player</th>
-          <th>Pos</th>
-          <th>Team</th>
-          <th>Bye</th>
-          <th>Age</th>
-          <th>Inj</th>
-          <th class="r">Floor</th>
-          <th class="r">Proj</th>
-          <th class="r">Ceil</th>
-          <th class="r">3D</th>
-        </tr>
-      </thead>
+      <thead id="board-thead"><tr></tr></thead>
       <tbody id="tbody"></tbody>
     </table>
   </div>
@@ -371,11 +360,7 @@ tr.keeper .name-cell { font-style: italic; }
   <div id="chart-tooltip" class="chart-tooltip"></div>
 
   <div style="margin-top:32px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-    <div style="display:flex;gap:4px">
-      <button class="chip active comp-base" data-base="ds">DraftSharks</button>
-      <button class="chip comp-base" data-base="boone">Boone</button>
-      <button class="chip comp-base" data-base="ciely">Ciely</button>
-    </div>
+    <span style="color:var(--text-dim);font-size:13px;font-weight:500" id="comp-base-label">DraftSharks</span>
     <span style="color:var(--text-muted)">vs</span>
     <div style="display:flex;gap:4px">
       <button class="chip active comp-src" data-src="espn">ESPN</button>
@@ -399,7 +384,7 @@ tr.keeper .name-cell { font-style: italic; }
   <div class="chart-header" style="margin-top:32px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
     <div>
       <h2>Combined Value</h2>
-      <p>Source adj rank minus DS raw rank — positive means source undervalues</p>
+      <p id="combined-desc">Source adj rank minus DS raw rank — positive means source undervalues</p>
     </div>
     <div style="margin-left:auto;display:flex;gap:12px;flex-wrap:wrap">
       <div style="display:flex;gap:4px">
@@ -430,6 +415,9 @@ tr.keeper .name-cell { font-style: italic; }
         <option value="7">Round 7</option><option value="8">Round 8</option>
         <option value="9">Round 9</option><option value="10">Round 10</option>
         <option value="11">Round 11</option><option value="12">Round 12</option>
+        <option value="13">Round 13</option><option value="14">Round 14</option>
+        <option value="15">Round 15</option><option value="16">Round 16</option>
+        <option value="17">Round 17</option><option value="18">Round 18</option>
       </select>
     </div>
   </div>
@@ -454,8 +442,8 @@ const KEEPERS=[{"name":"Chris Olave","round":3,"pick":1},{"name":"Tyler Warren",
 /*END_KEEPERS*/
 
 const TEAMS = 12;
-const ROUNDS = 12;
-const LS_KEY = 'draftBoard_drafted_v2';
+const ROUNDS = 18;
+const LS_KEY = 'draftBoard_drafted_v3';
 const POS_COLORS = { QB: '#e06c8e', RB: '#58b896', WR: '#6fa8dc', TE: '#d4a95a' };
 
 /* ── Keeper computation ── */
@@ -465,17 +453,24 @@ KEEPERS.forEach(k => {
   keeperMap.set(k.name, k);
 });
 
-const keeperRankInfo = [];
-DATA.forEach(r => {
-  const ki = keeperMap.get(r[1]);
-  if (ki) {
-    keeperRankInfo.push({ origRank: r[0], overallPick: ki.overallPick });
+function buildKeeperRankInfo(data) {
+  const info = [];
+  for (const r of data) {
+    const ki = keeperMap.get(r[1]);
+    if (ki) info.push({ origRank: r[0], overallPick: ki.overallPick });
   }
-});
+  return info;
+}
+
+let currentKeeperInfo = buildKeeperRankInfo(DATA);
+
+function rebuildKeeperInfo() {
+  currentKeeperInfo = buildKeeperRankInfo(activeData());
+}
 
 function getAdjRank(origRank) {
   let delta = 0;
-  for (const k of keeperRankInfo) {
+  for (const k of currentKeeperInfo) {
     if (k.origRank < origRank && k.overallPick > origRank) delta++;
   }
   return origRank - delta;
@@ -502,24 +497,43 @@ function injClass(s) {
 
 /* ── Board rendering ── */
 function renderBoard() {
+  const data = activeData();
+  const isFull = compBase === 'ds';
+  const colSpan = isFull ? 13 : 5;
+
+  const thead = document.getElementById('board-thead');
+  if (isFull) {
+    thead.innerHTML = `<tr>
+      <th style="width:36px">#</th><th style="width:40px">Adj</th><th style="width:84px"></th>
+      <th>Player</th><th>Pos</th><th>Team</th><th>Bye</th><th>Age</th>
+      <th>Inj</th><th class="r">Floor</th><th class="r">Proj</th><th class="r">Ceil</th><th class="r">3D</th>
+    </tr>`;
+  } else {
+    thead.innerHTML = `<tr>
+      <th style="width:36px">#</th><th style="width:40px">Adj</th><th style="width:84px"></th>
+      <th>Player</th><th>Pos</th>
+    </tr>`;
+  }
+
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
   let availCount = 0, draftedCount = 0, keptCount = 0;
   let lastRound = 0;
 
-  const visible = DATA.filter(r => {
+  const visible = data.filter(r => {
     const isKeeper = keeperMap.has(r[1]);
     if (posFilter !== 'ALL' && r[2] !== posFilter) return false;
     if (hideKeepers && isKeeper) return false;
-    if (hideDrafted && !isKeeper && drafted.has(r[0])) return false;
+    if (hideDrafted && !isKeeper && drafted.has(r[1])) return false;
     if (searchTerm && !r[1].toLowerCase().includes(searchTerm)) return false;
     return true;
   });
 
   for (const r of visible) {
     const rank = r[0];
-    const isKeeper = keeperMap.has(r[1]);
-    const isDrafted = !isKeeper && drafted.has(rank);
+    const name = r[1];
+    const isKeeper = keeperMap.has(name);
+    const isDrafted = !isKeeper && drafted.has(name);
     const adj = isKeeper ? null : getAdjRank(rank);
     const rd = Math.min(ROUNDS, Math.max(1, Math.ceil(rank / TEAMS)));
 
@@ -535,7 +549,7 @@ function renderBoard() {
         : `Round ${rd}`;
       const rr = document.createElement('tr');
       rr.className = 'round-row';
-      rr.innerHTML = `<td colspan="13">${label}</td>`;
+      rr.innerHTML = `<td colspan="${colSpan}">${label}</td>`;
       tbody.appendChild(rr);
     }
 
@@ -543,12 +557,12 @@ function renderBoard() {
     if (isKeeper) tr.className = 'keeper';
     else if (isDrafted) tr.className = 'drafted';
 
-    const ki = keeperMap.get(r[1]);
+    const ki = keeperMap.get(name);
     let btnCell;
     if (isKeeper) {
       btnCell = `<td><span class="kept-badge">KEPT ${ki.round}.${String(ki.pick).padStart(2,'0')}</span></td>`;
     } else {
-      btnCell = `<td><button class="draft-btn" data-rank="${rank}">${isDrafted ? 'Drafted' : 'Set Drafted'}</button></td>`;
+      btnCell = `<td><button class="draft-btn" data-name="${name}">${isDrafted ? 'Drafted' : 'Set Drafted'}</button></td>`;
     }
 
     let adjCell;
@@ -558,21 +572,21 @@ function renderBoard() {
       adjCell = `<td class="adj-cell">${adj}</td>`;
     }
 
-    tr.innerHTML = `
-      <td>${rank}</td>
-      ${adjCell}
-      ${btnCell}
-      <td class="name-cell">${r[1]}</td>
-      <td><span class="pos-badge pos-${r[2]}">${r[2]}</span></td>
-      <td>${r[3]}</td>
-      <td>${r[4]}</td>
-      <td>${r[10] || '—'}</td>
-      <td class="${injClass(r[5])}">${r[5]}</td>
-      <td class="r">${r[6]}</td>
-      <td class="r">${r[7]}</td>
-      <td class="r">${r[8]}</td>
-      <td class="r td-value">${r[9]}</td>
-    `;
+    if (isFull) {
+      tr.innerHTML = `
+        <td>${rank}</td>${adjCell}${btnCell}
+        <td class="name-cell">${name}</td>
+        <td><span class="pos-badge pos-${r[2]}">${r[2]}</span></td>
+        <td>${r[3]}</td><td>${r[4]}</td><td>${r[10] || '—'}</td>
+        <td class="${injClass(r[5])}">${r[5]}</td>
+        <td class="r">${r[6]}</td><td class="r">${r[7]}</td>
+        <td class="r">${r[8]}</td><td class="r td-value">${r[9]}</td>`;
+    } else {
+      tr.innerHTML = `
+        <td>${rank}</td>${adjCell}${btnCell}
+        <td class="name-cell">${name}</td>
+        <td><span class="pos-badge pos-${r[2]}">${r[2]}</span></td>`;
+    }
     tbody.appendChild(tr);
   }
 
@@ -602,8 +616,15 @@ function drawChart() {
   const pw = W - pad.l - pad.r;
   const ph = H - pad.t - pad.b;
 
-  const lastAffected = Math.max(...keeperRankInfo.map(k => k.overallPick)) - 1;
-  const nonKeepers = DATA.filter(r => !keeperMap.has(r[1]) && r[0] <= lastAffected);
+  const data = activeData();
+  if (currentKeeperInfo.length === 0) {
+    ctx.fillStyle = '#181b23'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#8b8fa3'; ctx.font = '14px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('No keeper data for ' + BASE_LABELS[compBase], W/2, H/2);
+    chartPoints = []; return;
+  }
+  const lastAffected = Math.max(...currentKeeperInfo.map(k => k.overallPick)) - 1;
+  const nonKeepers = data.filter(r => !keeperMap.has(r[1]) && r[0] <= lastAffected);
   const maxR = lastAffected;
   const sx = v => pad.l + ((v - 1) / (maxR - 1)) * pw;
   const sy = v => pad.t + ((v - 1) / (maxR - 1)) * ph;
@@ -713,8 +734,7 @@ function setupChartHover() {
       const r = nearest.r;
       tooltip.innerHTML =
         `<strong>${r[1]}</strong> · <span style="color:${POS_COLORS[r[2]]}">${r[2]}</span><br>` +
-        `Rank ${r[0]} → Adj ${nearest.adj}` +
-        (nearest.delta > 0 ? ` <span style="color:#4ead7a">(+${nearest.delta})</span>` : '');
+        `Pick ${nearest.adj} has true value of pick ${r[0]}`;
       tooltip.style.display = 'block';
       tooltip.style.left = (e.clientX + 12) + 'px';
       tooltip.style.top = (e.clientY - 10) + 'px';
@@ -752,6 +772,14 @@ const COMP_CIELY=[["Jahmyr Gibbs","RB",2,1,2,1],["Bijan Robinson","RB",1,2,1,2],
 const COMP_CIELY_FP=[["Ja'Marr Chase","WR",3,1,3,1],["Jahmyr Gibbs","RB",2,2,2,2],["Bijan Robinson","RB",1,3,1,4],["Jaxon Smith-Njigba","WR",4,4,5,5],["Amon-Ra St. Brown","WR",7,5,8,6],["CeeDee Lamb","WR",11,6,14,7],["Justin Jefferson","WR",8,7,9,8],["Christian McCaffrey","RB",5,8,6,9],["Drake London","WR",17,9,23,10],["Jonathan Taylor","RB",6,10,7,11],["A.J. Brown","WR",10,11,13,12],["Ashton Jeanty","RB",14,12,17,14],["James Cook","RB",9,13,10,17],["George Pickens","WR",16,14,21,19],["Rashee Rice","WR",33,15,40,22],["DeVonta Smith","WR",23,16,30,23],["Malik Nabers","WR",24,17,32,24],["Omarion Hampton","RB",15,19,18,25],["Saquon Barkley","RB",12,20,15,26],["Josh Allen","QB",25,21,33,27],["Kenneth Walker III","RB",18,22,24,28],["Zay Flowers","WR",21,23,28,29],["Garrett Wilson","WR",36,24,43,30],["Lamar Jackson","QB",39,25,46,31],["Tetairoa McMillan","WR",34,26,41,32],["Jaylen Waddle","WR",38,27,45,33],["Tee Higgins","WR",22,29,29,35],["Derrick Henry","RB",13,30,16,36],["Breece Hall","RB",30,33,38,40],["Jeremiyah Love","RB",52,34,58,41],["Javonte Williams","RB",20,36,26,43],["Josh Jacobs","RB",28,37,36,44],["Terry McLaurin","WR",47,38,54,45],["Joe Burrow","QB",57,39,65,46],["Travis Etienne","RB",27,40,35,48],["Davante Adams","WR",45,41,52,49],["D.J. Moore","WR",44,42,51,50],["Jayden Daniels","QB",40,43,47,51],["Mike Evans","WR",37,44,44,53],["Jameson Williams","WR",46,45,53,54],["Rome Odunze","WR",56,47,64,56],["D'Andre Swift","RB",42,49,49,57],["Jalen Hurts","QB",58,51,66,59],["David Montgomery","RB",41,52,48,61],["Quinshon Judkins","RB",32,53,39,62],["Parker Washington","WR",54,54,60,63],["Caleb Williams","QB",74,55,78,64],["Carnell Tate","WR",55,56,63,65],["TreVeyon Henderson","RB",62,57,69,66],["Marvin Harrison Jr.","WR",64,58,71,67],["Bhayshul Tuten","RB",51,59,57,68],["Jadarian Price","RB",60,61,68,70],["Brian Thomas Jr.","WR",79,63,83,72],["Jaylen Warren","RB",91,65,94,73],["Trevor Lawrence","QB",73,66,77,74],["Tucker Kraft","TE",43,67,50,75],["Chris Godwin","WR",99,69,102,76],["D.K. Metcalf","WR",67,71,73,77],["Dak Prescott","QB",69,72,75,78],["Kyle Pitts","TE",82,73,87,79],["Rhamondre Stevenson","RB",59,74,67,80],["Michael Pittman Jr.","WR",84,75,88,81],["Courtland Sutton","WR",65,76,72,82],["Tony Pollard","RB",76,77,80,83],["Sam LaPorta","TE",102,78,105,84],["Wan'Dale Robinson","WR",86,79,90,85],["Josh Downs","WR",124,80,126,86],["Rico Dowdle","RB",77,81,81,87],["Michael Wilson","WR",109,83,111,88],["RJ Harvey","RB",93,84,95,89],["Jonathon Brooks","RB",49,85,56,90],["Brock Purdy","QB",96,86,99,91],["Jaxson Dart","QB",71,88,76,92],["Chuba Hubbard","RB",104,89,107,93],["Quentin Johnston","WR",81,90,85,94],["Travis Kelce","TE",101,92,104,95],["George Kittle","TE",68,93,74,96],["Kenneth Gainwell","RB",94,94,96,97],["Alec Pierce","WR",130,95,131,98],["Bo Nix","QB",97,96,100,99],["Patrick Mahomes","QB",75,97,79,100],["Jakobi Meyers","WR",126,98,127,101],["J.K. Dobbins","RB",95,99,97,102],["Matthew Stafford","QB",98,100,101,103],["Stefon Diggs","WR",80,101,84,104],["Jayden Reed","WR",100,102,103,105],["Jordan Addison","WR",90,103,93,106],["Jared Goff","QB",111,104,113,107],["Makai Lemon","WR",87,105,91,108],["Rachaad White","RB",112,106,114,109],["Blake Corum","RB",105,108,108,110],["Kyle Monangai","RB",148,109,148,111],["Kyler Murray","QB",118,110,120,112],["Aaron Jones","RB",113,111,115,113],["Dalton Kincaid","TE",134,112,135,114],["Jake Ferguson","TE",117,113,119,115],["Jacory Croskey-Merritt","RB",114,114,116,116],["Baker Mayfield","QB",119,115,121,117],["Jordan Mason","RB",103,116,106,118],["Jordan Love","QB",128,117,129,119],["Isaiah Likely","TE",115,118,117,120],["Khalil Shakir","WR",132,119,133,121],["Dallas Goedert","TE",116,120,118,122],["KC Concepcion","WR",89,121,92,123],["Jalen Coker","WR",85,122,89,124],["Tyler Shough","QB",127,123,128,125],["Xavier Worthy","WR",129,124,130,126],["Jordyn Tyson","WR",106,126,109,127],["Matthew Golden","WR",151,127,151,128],["Romeo Doubs","WR",123,128,125,129],["Mark Andrews","TE",135,129,136,130],["Malik Willis","QB",110,130,112,131],["Juwan Johnson","TE",133,131,134,132],["Tyler Allgeier","RB",78,132,82,133],["Woody Marks","RB",137,133,137,134],["Tyjae Spears","RB",140,134,140,135],["Chris Rodriguez","RB",120,135,122,136],["Sam Darnold","QB",146,137,146,137],["C.J. Stroud","QB",144,138,144,138],["Tyrone Tracy Jr.","RB",156,139,156,139],["De'Zhaun Stribling","WR",153,140,153,140],["Dylan Sampson","RB",149,141,149,141],["Deebo Samuel","WR",108,142,110,142],["Denzel Boston","WR",154,143,154,143],["Daniel Jones","QB",145,144,145,144],["Zach Charbonnet","RB",218,145,218,145],["Rashid Shaheed","WR",142,146,142,146],["Keaton Mitchell","RB",141,147,141,147],["Cameron Ward","QB",174,148,174,148],["Brenton Strange","TE",169,149,169,149],["Chigoziem Okonkwo","TE",188,150,188,150],["Alvin Kamara","RB",147,151,147,151],["Jonah Coleman","RB",171,152,171,152],["Isiah Pacheco","RB",121,153,123,153],["Hunter Henry","TE",167,154,167,154],["Tre Tucker","WR",155,161,155,161],["Brian Robinson Jr.","RB",138,165,138,165],["Braelon Allen","RB",122,168,124,168],["Jalen Nailor","WR",152,174,152,174],["MarShawn Lloyd","RB",139,184,139,184],["Tank Dell","WR",150,197,150,197],["Rashod Bateman","WR",131,215,132,215],["Caleb Douglas","WR",143,267,143,267]];
 /*END_COMP_CIELY_FP*/
 
+/*BEGIN_DATA_BOONE*/
+const DATA_BOONE=[[1,"Jahmyr Gibbs","RB"],[2,"Bijan Robinson","RB"],[3,"Ja'Marr Chase","WR"],[4,"Jaxon Smith-Njigba","WR"],[5,"Puka Nacua","WR"],[6,"Christian McCaffrey","RB"],[7,"Amon-Ra St. Brown","WR"],[8,"CeeDee Lamb","WR"],[9,"James Cook","RB"],[10,"Justin Jefferson","WR"],[11,"Jonathan Taylor","RB"],[12,"Drake London","WR"],[13,"Brock Bowers","TE"],[14,"Ashton Jeanty","RB"],[15,"Saquon Barkley","RB"],[16,"Chase Brown","RB"],[17,"De'Von Achane","RB"],[18,"Omarion Hampton","RB"],[19,"Malik Nabers","WR"],[20,"Nico Collins","WR"],[21,"DeVonta Smith","WR"],[22,"A.J. Brown","WR"],[23,"George Pickens","WR"],[24,"Chris Olave","WR"],[25,"Rashee Rice","WR"],[26,"Jaylen Waddle","WR"],[27,"Zay Flowers","WR"],[28,"Kyren Williams","RB"],[29,"Derrick Henry","RB"],[30,"Breece Hall","RB"],[31,"Tee Higgins","WR"],[32,"Trey McBride","TE"],[33,"Ladd McConkey","WR"],[34,"Colston Loveland","TE"],[35,"Josh Allen","QB"],[36,"Jeremiyah Love","RB"],[37,"Luther Burden III","WR"],[38,"Garrett Wilson","WR"],[39,"Tetairoa McMillan","WR"],[40,"Emeka Egbuka","WR"],[41,"Terry McLaurin","WR"],[42,"Javonte Williams","RB"],[43,"D'Andre Swift","RB"],[44,"Christian Watson","WR"],[45,"Parker Washington","WR"],[46,"Tyler Warren","TE"],[47,"Travis Etienne","RB"],[48,"Josh Jacobs","RB"],[49,"Jameson Williams","WR"],[50,"D.J. Moore","WR"],[51,"Cameron Skattebo","RB"],[52,"Quinshon Judkins","RB"],[53,"Davante Adams","WR"],[54,"Lamar Jackson","QB"],[55,"Mike Evans","WR"],[56,"David Montgomery","RB"],[57,"Carnell Tate","WR"],[58,"Rome Odunze","WR"],[59,"Marvin Harrison Jr.","WR"],[60,"Bhayshul Tuten","RB"],[61,"Tucker Kraft","TE"],[62,"Jadarian Price","RB"],[63,"Bucky Irving","RB"],[64,"Stefon Diggs","WR"],[65,"Chris Godwin","WR"],[66,"Jayden Daniels","QB"],[67,"Rhamondre Stevenson","RB"],[68,"TreVeyon Henderson","RB"],[69,"Drake Maye","QB"],[70,"Jalen Hurts","QB"],[71,"Joe Burrow","QB"],[72,"Caleb Williams","QB"],[73,"D.K. Metcalf","WR"],[74,"De'Zhaun Stribling","WR"],[75,"Jacory Croskey-Merritt","RB"],[76,"Justin Herbert","QB"],[77,"Jonathon Brooks","RB"],[78,"Josh Downs","WR"],[79,"Jaylen Warren","RB"],[80,"Rico Dowdle","RB"],[81,"Tony Pollard","RB"],[82,"Harold Fannin Jr.","TE"],[83,"George Kittle","TE"],[84,"Sam LaPorta","TE"],[85,"Jordyn Tyson","WR"],[86,"Alec Pierce","WR"],[87,"Trevor Lawrence","QB"],[88,"Makai Lemon","WR"],[89,"Jayden Reed","WR"],[90,"Kyle Pitts","TE"],[91,"J.K. Dobbins","RB"],[92,"Dak Prescott","QB"],[93,"Brock Purdy","QB"],[94,"Kenneth Gainwell","RB"],[95,"Michael Wilson","WR"],[96,"Jordan Mason","RB"],[97,"Chuba Hubbard","RB"],[98,"Blake Corum","RB"],[99,"RJ Harvey","RB"],[100,"Dalton Kincaid","TE"],[101,"Jaxson Dart","QB"],[102,"Kyle Monangai","RB"],[103,"Jordan Addison","WR"],[104,"Quentin Johnston","WR"],[105,"Bo Nix","QB"],[106,"Courtland Sutton","WR"],[107,"Wan'Dale Robinson","WR"],[108,"Jalen Coker","WR"],[109,"Matthew Golden","WR"],[110,"Michael Pittman Jr.","WR"],[111,"KC Concepcion","WR"],[112,"Rachaad White","RB"],[113,"Aaron Jones","RB"],[114,"Denzel Boston","WR"],[115,"Jakobi Meyers","WR"],[116,"Kyler Murray","QB"],[117,"Travis Kelce","TE"],[118,"Dallas Goedert","TE"],[119,"Rashid Shaheed","WR"],[120,"Isaiah Likely","TE"],[121,"Chris Rodriguez","RB"],[122,"Jonah Coleman","RB"],[123,"Tyler Allgeier","RB"],[124,"Mark Andrews","TE"],[125,"Keaton Mitchell","RB"],[126,"Patrick Mahomes","QB"],[127,"MarShawn Lloyd","RB"],[128,"Tyjae Spears","RB"],[129,"Jaydon Blue","RB"],[130,"Woody Marks","RB"],[131,"Romeo Doubs","WR"],[132,"Xavier Worthy","WR"],[133,"Khalil Shakir","WR"],[134,"Jalen McMillan","WR"],[135,"Zach Charbonnet","RB"],[136,"Brian Robinson Jr.","RB"],[137,"Jared Goff","QB"],[138,"Matthew Stafford","QB"],[139,"Malik Willis","QB"],[140,"Deebo Samuel","WR"],[141,"Emmett Johnson","RB"],[142,"Tyler Shough","QB"],[143,"Juwan Johnson","TE"],[144,"Keenan Allen","WR"],[145,"Dylan Sampson","RB"],[146,"Baker Mayfield","QB"],[147,"Jake Ferguson","TE"],[148,"Alvin Kamara","RB"],[149,"Brenton Strange","TE"],[150,"Isiah Pacheco","RB"],[151,"Sam Darnold","QB"],[152,"Justice Hill","RB"],[153,"C.J. Stroud","QB"],[154,"Cameron Ward","QB"],[155,"Daniel Jones","QB"],[156,"Jacoby Brissett","QB"],[157,"Bryce Young","QB"],[158,"Fernando Mendoza","QB"],[159,"Geno Smith","QB"],[160,"Aaron Rodgers","QB"]];
+/*END_DATA_BOONE*/
+
+/*BEGIN_DATA_CIELY*/
+const DATA_CIELY=[[1,"Bijan Robinson","RB"],[2,"Jahmyr Gibbs","RB"],[3,"Ja'Marr Chase","WR"],[4,"Puka Nacua","WR"],[5,"Jaxon Smith-Njigba","WR"],[6,"Christian McCaffrey","RB"],[7,"Jonathan Taylor","RB"],[8,"Amon-Ra St. Brown","WR"],[9,"Justin Jefferson","WR"],[10,"James Cook","RB"],[11,"Chase Brown","RB"],[12,"De'Von Achane","RB"],[13,"A.J. Brown","WR"],[14,"CeeDee Lamb","WR"],[15,"Saquon Barkley","RB"],[16,"Derrick Henry","RB"],[17,"Ashton Jeanty","RB"],[18,"Omarion Hampton","RB"],[19,"Brock Bowers","TE"],[20,"Trey McBride","TE"],[21,"George Pickens","WR"],[22,"Chris Olave","WR"],[23,"Drake London","WR"],[24,"Kenneth Walker III","RB"],[25,"Kyren Williams","RB"],[26,"Javonte Williams","RB"],[27,"Nico Collins","WR"],[28,"Zay Flowers","WR"],[29,"Tee Higgins","WR"],[30,"DeVonta Smith","WR"],[31,"Emeka Egbuka","WR"],[32,"Malik Nabers","WR"],[33,"Josh Allen","QB"],[34,"Drake Maye","QB"],[35,"Travis Etienne","RB"],[36,"Josh Jacobs","RB"],[37,"Colston Loveland","TE"],[38,"Breece Hall","RB"],[39,"Quinshon Judkins","RB"],[40,"Rashee Rice","WR"],[41,"Tetairoa McMillan","WR"],[42,"Ladd McConkey","WR"],[43,"Garrett Wilson","WR"],[44,"Mike Evans","WR"],[45,"Jaylen Waddle","WR"],[46,"Lamar Jackson","QB"],[47,"Jayden Daniels","QB"],[48,"David Montgomery","RB"],[49,"D'Andre Swift","RB"],[50,"Tucker Kraft","TE"],[51,"D.J. Moore","WR"],[52,"Davante Adams","WR"],[53,"Jameson Williams","WR"],[54,"Terry McLaurin","WR"],[55,"Bucky Irving","RB"],[56,"Jonathon Brooks","RB"],[57,"Bhayshul Tuten","RB"],[58,"Jeremiyah Love","RB"],[59,"Tyler Warren","TE"],[60,"Parker Washington","WR"],[61,"Luther Burden III","WR"],[62,"Christian Watson","WR"],[63,"Carnell Tate","WR"],[64,"Rome Odunze","WR"],[65,"Joe Burrow","QB"],[66,"Jalen Hurts","QB"],[67,"Rhamondre Stevenson","RB"],[68,"Jadarian Price","RB"],[69,"TreVeyon Henderson","RB"],[70,"Cameron Skattebo","RB"],[71,"Marvin Harrison Jr.","WR"],[72,"Courtland Sutton","WR"],[73,"D.K. Metcalf","WR"],[74,"George Kittle","TE"],[75,"Dak Prescott","QB"],[76,"Jaxson Dart","QB"],[77,"Trevor Lawrence","QB"],[78,"Caleb Williams","QB"],[79,"Patrick Mahomes","QB"],[80,"Tony Pollard","RB"],[81,"Rico Dowdle","RB"],[82,"Tyler Allgeier","RB"],[83,"Brian Thomas Jr.","WR"],[84,"Stefon Diggs","WR"],[85,"Quentin Johnston","WR"],[86,"Harold Fannin Jr.","TE"],[87,"Kyle Pitts","TE"],[88,"Michael Pittman Jr.","WR"],[89,"Jalen Coker","WR"],[90,"Wan'Dale Robinson","WR"],[91,"Makai Lemon","WR"],[92,"KC Concepcion","WR"],[93,"Jordan Addison","WR"],[94,"Jaylen Warren","RB"],[95,"RJ Harvey","RB"],[96,"Kenneth Gainwell","RB"],[97,"J.K. Dobbins","RB"],[98,"Justin Herbert","QB"],[99,"Brock Purdy","QB"],[100,"Bo Nix","QB"],[101,"Matthew Stafford","QB"],[102,"Chris Godwin","WR"],[103,"Jayden Reed","WR"],[104,"Travis Kelce","TE"],[105,"Sam LaPorta","TE"],[106,"Jordan Mason","RB"],[107,"Chuba Hubbard","RB"],[108,"Blake Corum","RB"],[109,"Jordyn Tyson","WR"],[110,"Deebo Samuel","WR"],[111,"Michael Wilson","WR"],[112,"Malik Willis","QB"],[113,"Jared Goff","QB"],[114,"Rachaad White","RB"],[115,"Aaron Jones","RB"],[116,"Jacory Croskey-Merritt","RB"],[117,"Isaiah Likely","TE"],[118,"Dallas Goedert","TE"],[119,"Jake Ferguson","TE"],[120,"Kyler Murray","QB"],[121,"Baker Mayfield","QB"],[122,"Chris Rodriguez","RB"],[123,"Isiah Pacheco","RB"],[124,"Braelon Allen","RB"],[125,"Romeo Doubs","WR"],[126,"Josh Downs","WR"],[127,"Jakobi Meyers","WR"],[128,"Tyler Shough","QB"],[129,"Jordan Love","QB"],[130,"Xavier Worthy","WR"],[131,"Alec Pierce","WR"],[132,"Rashod Bateman","WR"],[133,"Khalil Shakir","WR"],[134,"Juwan Johnson","TE"],[135,"Dalton Kincaid","TE"],[136,"Mark Andrews","TE"],[137,"Woody Marks","RB"],[138,"Brian Robinson Jr.","RB"],[139,"MarShawn Lloyd","RB"],[140,"Tyjae Spears","RB"],[141,"Keaton Mitchell","RB"],[142,"Rashid Shaheed","WR"],[143,"Caleb Douglas","WR"],[144,"C.J. Stroud","QB"],[145,"Daniel Jones","QB"],[146,"Sam Darnold","QB"],[147,"Alvin Kamara","RB"],[148,"Kyle Monangai","RB"],[149,"Dylan Sampson","RB"],[150,"Tank Dell","WR"],[151,"Matthew Golden","WR"],[152,"Jalen Nailor","WR"],[153,"De'Zhaun Stribling","WR"],[154,"Denzel Boston","WR"],[155,"Tre Tucker","WR"],[156,"Tyrone Tracy Jr.","RB"],[157,"Tank Bigsby","RB"],[158,"Jaydon Blue","RB"],[159,"Justice Hill","RB"],[160,"Emanuel Wilson","RB"],[161,"Malachi Fields","WR"],[162,"Adonai Mitchell","WR"],[163,"Keenan Allen","WR"],[164,"Jerry Jeudy","WR"],[165,"Jalen McMillan","WR"],[166,"Dalton Schultz","TE"],[167,"Hunter Henry","TE"],[168,"T.J. Hockenson","TE"],[169,"Brenton Strange","TE"],[170,"Mike Washington Jr.","RB"],[171,"Jonah Coleman","RB"],[172,"Nicholas Singleton","RB"],[173,"Kaytron Allen","RB"],[174,"Cameron Ward","QB"],[175,"Bryce Young","QB"],[176,"Aaron Rodgers","QB"],[177,"Ray Davis","RB"],[178,"Samaje Perine","RB"],[179,"Najee Harris","RB"],[180,"Isaac TeSlaa","WR"],[181,"Jauan Jennings","WR"],[182,"Dontayvion Wicks","WR"],[183,"Devaughn Vele","WR"],[184,"Ja'Kobi Lane","WR"],[185,"Terrance Ferguson","TE"],[186,"Greg Dulcich","TE"],[187,"Oronde Gadsden II","TE"],[188,"Chigoziem Okonkwo","TE"],[189,"Pat Freiermuth","TE"],[190,"Emmett Johnson","RB"],[191,"Ty Johnson","RB"],[192,"Ollie Gordon II","RB"],[193,"Kimani Vidal","RB"],[194,"Tyquan Thornton","WR"],[195,"Calvin Ridley","WR"],[196,"Jaylin Noel","WR"],[197,"Omar Cooper Jr.","WR"],[198,"Ryan Flournoy","WR"],[199,"Malik Washington","WR"],[200,"Tre' Harris","WR"],[201,"Cooper Kupp","WR"],[202,"Jalen Tolbert","WR"],[203,"Andrei Iosivas","WR"],[204,"Zachariah Branch","WR"],[205,"Pat Bryant","WR"],[206,"Keon Coleman","WR"],[207,"Jahan Dotson","WR"],[208,"DeMario Douglas","WR"],[209,"Germie Bernard","WR"],[210,"Darnell Mooney","WR"],[211,"Jack Bech","WR"],[212,"Kayshon Boutte","WR"],[213,"Kenyon Sadiq","TE"],[214,"David Njoku","TE"],[215,"AJ Barner","TE"],[216,"Kaelon Black","RB"],[217,"Demond Claiborne","RB"],[218,"Zach Charbonnet","RB"],[219,"Jacoby Brissett","QB"],[220,"Geno Smith","QB"],[221,"Fernando Mendoza","QB"],[222,"Tua Tagovailoa","QB"],[223,"Deshaun Watson","QB"],[224,"LeQuint Allen Jr.","RB"],[225,"Sean Tucker","RB"],[226,"Jaylen Wright","RB"],[227,"Emari Demercado","RB"],[228,"Chris Brooks","RB"],[229,"Malik Davis","RB"],[230,"Isaiah Davis","RB"],[231,"Trey Benson","RB"],[232,"Troy Franklin","WR"],[233,"Travis Hunter","WR"],[234,"Antonio Williams","WR"],[235,"Darius Slayton","WR"],[236,"Mike Gesicki","TE"],[237,"Mason Taylor","TE"],[238,"Chris Bell","WR"],[239,"Xavier Legette","WR"],[240,"Ted Hurst III","WR"],[241,"Dont'e Thornton Jr.","WR"],[242,"Konata Mumpfield","WR"],[243,"Elic Ayomanor","WR"],[244,"Kirk Cousins","QB"],[245,"Shedeur Sanders","QB"],[246,"Michael Penix Jr.","QB"],[247,"Gunnar Helm","TE"],[248,"Cade Otton","TE"],[249,"Evan Engram","TE"],[250,"Elijah Arroyo","TE"],[251,"Eli Raridon","TE"],[252,"KaVontae Turpin","WR"],[253,"James Conner","RB"],[254,"Michael Mayer","TE"],[255,"Jordan James","RB"],[256,"Seth McGowan","RB"],[257,"Colby Parkinson","TE"],[258,"Olamide Zaccheaus","WR"],[259,"Adam Randall","RB"],[260,"Darnell Washington","TE"],[261,"Kendre Miller","RB"],[262,"Mack Hollins","WR"],[263,"Will Shipley","RB"],[264,"Isaiah Bond","WR"],[265,"Dawson Knox","TE"],[266,"Nick Westbrook-Ikhine","WR"],[267,"Eli Stowers","TE"],[268,"Eli Heidenreich","RB"],[269,"Devin Neal","RB"],[270,"Savion Williams","WR"],[271,"Tahj Brooks","RB"],[272,"Elijah Sarratt","WR"],[273,"Christian Kirk","WR"],[274,"Kendrick Bourne","WR"],[275,"Ja'Tavion Sanders","TE"],[276,"Tory Horton","WR"],[277,"Jake Tonges","TE"],[278,"Marvin Mims Jr.","WR"],[279,"Joshua Palmer","WR"],[280,"Tutu Atwell","WR"],[281,"Justin Fields","QB"],[282,"Theo Johnson","TE"],[283,"Anthony Richardson Sr.","QB"],[284,"Bryce Lance","WR"],[285,"Cyrus Allen","WR"],[286,"Cole Kmet","TE"],[287,"Chimere Dike","WR"],[288,"Erick All Jr.","TE"],[289,"Skyler Bell","WR"],[290,"Hollywood Brown","WR"],[291,"J.J. McCarthy","QB"],[292,"Max Klare","TE"],[293,"Brenen Thompson","WR"],[294,"Kalif Raymond","WR"],[295,"Tommy Tremble","TE"],[296,"Justin Joly","TE"],[297,"Luke Musgrave","TE"],[298,"Marcus Mariota","QB"],[299,"Jalen Royals","WR"],[300,"Tyler Huntley","QB"],[301,"Jaylin Lane","WR"],[302,"Devontez Walker","WR"],[303,"Treylon Burks","WR"],[304,"Kyle Williams","WR"],[305,"Zavion Thomas","WR"],[306,"Jaleel McLaughlin","RB"],[307,"Kaleb Johnson","RB"]];
+/*END_DATA_CIELY*/
+
 let compSource = 'espn';
 let compBase = 'ds';
 const COMP_MAP = {
@@ -759,9 +787,11 @@ const COMP_MAP = {
   'boone-espn': COMP_BOONE, 'boone-fp': COMP_BOONE_FP,
   'ciely-espn': COMP_CIELY, 'ciely-fp': COMP_CIELY_FP
 };
+const DATA_MAP = { ds: DATA, boone: DATA_BOONE, ciely: DATA_CIELY };
 const BASE_LABELS = { ds: 'DraftSharks', boone: 'Boone', ciely: 'Ciely' };
 const BASE_SHORT = { ds: 'DS', boone: 'Boone', ciely: 'Ciely' };
 function activeComp() { return COMP_MAP[compBase + '-' + compSource]; }
+function activeData() { return DATA_MAP[compBase]; }
 
 let compPoints = [];
 
@@ -1118,6 +1148,7 @@ function updateCompTitles() {
   document.getElementById('legend-src').textContent = srcLabel + ' Rank';
   document.getElementById('legend-higher2').textContent = baseShort + ' ranks higher (value)';
   document.getElementById('legend-lower2').textContent = baseShort + ' ranks lower';
+  document.getElementById('combined-desc').textContent = 'Source adj rank minus ' + baseShort + ' raw rank — positive means source undervalues';
 }
 
 function redrawComps() {
@@ -1133,6 +1164,13 @@ document.querySelectorAll('.comp-base').forEach(btn => {
     document.querySelectorAll('.comp-base').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     compBase = btn.dataset.base;
+    rebuildKeeperInfo();
+    renderBoard();
+    const lbl = document.getElementById('comp-base-label');
+    if (lbl) lbl.textContent = BASE_LABELS[compBase];
+    if (document.querySelector('.tab[data-tab="analytics"]').classList.contains('active')) {
+      drawChart(); setupChartHover();
+    }
     redrawComps();
   });
 });
@@ -1182,9 +1220,9 @@ document.getElementById('roundFilter').addEventListener('change', function() {
 document.getElementById('tbody').addEventListener('click', e => {
   const btn = e.target.closest('.draft-btn');
   if (!btn) return;
-  const rank = parseInt(btn.dataset.rank);
-  if (drafted.has(rank)) drafted.delete(rank);
-  else drafted.add(rank);
+  const name = btn.dataset.name;
+  if (drafted.has(name)) drafted.delete(name);
+  else drafted.add(name);
   saveDrafted();
   renderBoard();
 });

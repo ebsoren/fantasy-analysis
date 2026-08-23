@@ -173,7 +173,7 @@ def build_comp_data(data, keepers, ext_path, rank_field):
 
 
 def update_html(data, keepers, comp, comp_fp, comp_boone, comp_boone_fp,
-                comp_ciely, comp_ciely_fp):
+                comp_ciely, comp_ciely_fp, boone_data, ciely_data):
     with open(HTML_PATH) as f:
         html = f.read()
 
@@ -186,6 +186,8 @@ def update_html(data, keepers, comp, comp_fp, comp_boone, comp_boone_fp,
         'COMP_BOONE_FP': 'const COMP_BOONE_FP=' + json.dumps(comp_boone_fp, separators=(',', ':')) + ';',
         'COMP_CIELY': 'const COMP_CIELY=' + json.dumps(comp_ciely, separators=(',', ':')) + ';',
         'COMP_CIELY_FP': 'const COMP_CIELY_FP=' + json.dumps(comp_ciely_fp, separators=(',', ':')) + ';',
+        'DATA_BOONE': 'const DATA_BOONE=' + json.dumps(boone_data, separators=(',', ':')) + ';',
+        'DATA_CIELY': 'const DATA_CIELY=' + json.dumps(ciely_data, separators=(',', ':')) + ';',
     }
 
     for name, js in blocks.items():
@@ -221,7 +223,7 @@ def main():
     comp_ciely_fp = build_comp_data(ciely_data, keepers, FP_PATH, 'fp_ppr_rank')
 
     update_html(data, keepers, comp, comp_fp, comp_boone, comp_boone_fp,
-                comp_ciely, comp_ciely_fp)
+                comp_ciely, comp_ciely_fp, boone_data, ciely_data)
     print(f"Comparison data: DS({len(comp)} ESPN, {len(comp_fp)} FP) "
           f"Boone({len(comp_boone)} ESPN, {len(comp_boone_fp)} FP) "
           f"Ciely({len(comp_ciely)} ESPN, {len(comp_ciely_fp)} FP)")
