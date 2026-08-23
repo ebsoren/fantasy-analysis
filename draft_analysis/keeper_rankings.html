@@ -1,0 +1,522 @@
+<title>Keeper Rankings</title>
+<style>
+:root {
+  --bg: #F0EEE9;
+  --bg-table: #F7F5F1;
+  --bg-row-hover: #E8E5DE;
+  --bg-header: #2A2D35;
+  --text: #1E2028;
+  --text-secondary: #6D6F78;
+  --text-header: #E4E2DC;
+  --border: #D5D2CA;
+  --pos-qb: #C4653A;
+  --pos-rb: #3A82A8;
+  --pos-wr: #6A8C3A;
+  --pos-te: #8A6AB5;
+  --positive: #268A6E;
+  --negative: #BE4F3A;
+  --chip-bg: #E2DFD8;
+  --chip-active-bg: #2A2D35;
+  --chip-active-text: #E4E2DC;
+  --highlight-row: rgba(38, 138, 110, 0.06);
+  --shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111318;
+    --bg-table: #181A21;
+    --bg-row-hover: #23262F;
+    --bg-header: #0D0E13;
+    --text: #D2D0C8;
+    --text-secondary: #8A8C94;
+    --text-header: #A8A6A0;
+    --border: #2A2D36;
+    --pos-qb: #D97A50;
+    --pos-rb: #4FA0C8;
+    --pos-wr: #85AD50;
+    --pos-te: #A685D0;
+    --positive: #3CB08A;
+    --negative: #D4634B;
+    --chip-bg: #23262F;
+    --chip-active-bg: #D2D0C8;
+    --chip-active-text: #111318;
+    --highlight-row: rgba(60, 176, 138, 0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111318;
+  --bg-table: #181A21;
+  --bg-row-hover: #23262F;
+  --bg-header: #0D0E13;
+  --text: #D2D0C8;
+  --text-secondary: #8A8C94;
+  --text-header: #A8A6A0;
+  --border: #2A2D36;
+  --pos-qb: #D97A50;
+  --pos-rb: #4FA0C8;
+  --pos-wr: #85AD50;
+  --pos-te: #A685D0;
+  --positive: #3CB08A;
+  --negative: #D4634B;
+  --chip-bg: #23262F;
+  --chip-active-bg: #D2D0C8;
+  --chip-active-text: #111318;
+  --highlight-row: rgba(60, 176, 138, 0.06);
+  --shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  margin: 0;
+  padding: 20px 20px 60px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page-header {
+  max-width: 1400px;
+  margin: 0 auto 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px 24px;
+}
+
+.page-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.page-header .subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.controls {
+  max-width: 1400px;
+  margin: 0 auto 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.controls .label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-right: 2px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--chip-bg);
+  color: var(--text);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+.chip:hover { opacity: 0.85; }
+.chip.active {
+  background: var(--chip-active-bg);
+  color: var(--chip-active-text);
+}
+
+.table-wrap {
+  max-width: 1400px;
+  margin: 0 auto;
+  overflow-x: auto;
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  min-width: 900px;
+}
+
+thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+thead th {
+  background: var(--bg-header);
+  color: var(--text-header);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 10px 12px;
+  text-align: right;
+  white-space: nowrap;
+  cursor: pointer;
+  border-bottom: 2px solid var(--border);
+  position: relative;
+  user-select: none;
+  transition: color 0.15s;
+}
+thead th:hover { color: #fff; }
+thead th.col-name,
+thead th.col-pos,
+thead th.col-team { text-align: left; }
+
+thead th .sort-arrow {
+  display: inline-block;
+  width: 14px;
+  margin-left: 3px;
+  font-size: 10px;
+  opacity: 0.35;
+  vertical-align: middle;
+}
+thead th.sorted .sort-arrow { opacity: 1; }
+
+tbody tr {
+  background: var(--bg-table);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+tbody tr:hover { background: var(--bg-row-hover); }
+tbody tr.highlight { background: var(--highlight-row); }
+
+td {
+  padding: 7px 12px;
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+td.col-name {
+  text-align: left;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  min-width: 180px;
+}
+
+td.col-pos {
+  text-align: left;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+td.col-pos span {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 3px;
+  line-height: 1.3;
+}
+td.col-pos .QB { color: var(--pos-qb); }
+td.col-pos .RB { color: var(--pos-rb); }
+td.col-pos .WR { color: var(--pos-wr); }
+td.col-pos .TE { color: var(--pos-te); }
+
+td.col-team {
+  text-align: left;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+td.col-injury { font-size: 12px; }
+
+td.col-change {
+  font-weight: 700;
+  font-size: 13px;
+}
+td.col-change.pos { color: var(--positive); }
+td.col-change.neg { color: var(--negative); }
+
+td.col-adjusted {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.bar-cell {
+  position: relative;
+}
+.bar-cell .bar {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  border-radius: 2px;
+  opacity: 0.12;
+  pointer-events: none;
+}
+.bar-cell .bar.pos-bar { background: var(--positive); }
+.bar-cell .bar.neg-bar { background: var(--negative); right: 0; left: auto; }
+.bar-cell .val { position: relative; z-index: 1; }
+
+.legend {
+  max-width: 1400px;
+  margin: 16px auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.legend .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 6px;
+}
+
+.round-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.round-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--chip-bg);
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+.round-chip:hover { opacity: 0.85; }
+.round-chip.active {
+  background: var(--chip-active-bg);
+  color: var(--chip-active-text);
+}
+
+.filter-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  body { padding: 12px 8px 40px; }
+  .page-header h1 { font-size: 18px; }
+  td, thead th { padding: 6px 8px; }
+  td.col-name { min-width: 140px; }
+}
+</style>
+
+<div class="page-header">
+  <h1>PPR Keeper Rankings 2026</h1>
+  <p class="subtitle">12-team league &middot; keeper cost = draft round &minus; 2 &middot; waiver adds = Rd 8</p>
+</div>
+
+<div class="controls">
+  <span class="label">Position</span>
+  <button class="chip active" data-pos="ALL">All</button>
+  <button class="chip" data-pos="QB">QB</button>
+  <button class="chip" data-pos="RB">RB</button>
+  <button class="chip" data-pos="WR">WR</button>
+  <button class="chip" data-pos="TE">TE</button>
+  <span class="divider"></span>
+  <span class="label">Rounds</span>
+  <div class="round-chips" id="round-chips"></div>
+  <span class="filter-count" id="filter-count"></span>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr id="header-row"></tr>
+    </thead>
+    <tbody id="table-body"></tbody>
+  </table>
+</div>
+
+<div class="legend">
+  <span><span class="dot" style="background:var(--positive)"></span> Positive keeper value</span>
+  <span><span class="dot" style="background:var(--negative)"></span> Negative keeper value</span>
+  <span>Click any column header to sort</span>
+</div>
+
+<script>
+const D=[[2,"Jahmyr Gibbs","RB","DET",24,3,"54%",290.4,359.0,412.3,100.0,1.7,101.7],[1,"Puka Nacua","WR","LAR",25,3,"51%",268.0,357.0,396.7,100.0,1.4,101.4],[3,"Ja'Marr Chase","WR","CIN",26,5,"37%",298.2,339.0,399.8,98.0,3.1,101.1],[4,"Bijan Robinson","RB","ATL",24,3,"25%",294.0,346.0,404.7,95.0,4.2,99.2],[6,"Jaxon Smith-Njigba","WR","SEA",24,3,"39%",286.7,315.0,374.9,85.0,3.4,88.4],[7,"Amon-Ra St. Brown","WR","DET",26,5,"37%",287.9,316.0,357.5,83.0,3.1,86.1],[5,"Christian McCaffrey","RB","SF",30,9,"78%",274.7,331.0,410.5,89.0,-5.0,84.0],[8,"CeeDee Lamb","WR","DAL",27,6,"44%",262.2,301.0,361.6,77.0,2.4,79.4],[9,"Justin Jefferson","WR","MIN",27,6,"36%",248.0,292.0,379.3,75.0,3.1,78.1],[11,"Ashton Jeanty","RB","LVR",22,1,"39%",254.9,293.0,369.1,69.0,3.7,72.7],[12,"James Cook","RB","BUF",26,4,"36%",255.1,293.0,360.7,68.0,3.4,71.4],[10,"Jonathan Taylor","RB","IND",27,6,"37%",254.0,299.0,364.6,70.0,1.3,71.3],[13,"Drake London","WR","ATL",25,4,"73%",254.8,277.0,332.4,64.0,0.4,64.4],[14,"A.J. Brown","WR","NE",29,7,"61%",228.5,272.0,345.4,62.0,0.5,62.5],[15,"Nico Collins","WR","HOU",27,5,"49%",240.3,270.0,332.1,60.0,2.4,62.4],[18,"Kenneth Walker III","RB","KC",25,4,"34%",225.4,268.0,362.3,58.0,3.4,61.4],[16,"Rashee Rice","WR","KC",26,3,"74%",206.5,279.0,334.8,60.0,0.4,60.4],[20,"George Pickens","WR","DAL",25,4,"36%",232.9,262.0,327.2,56.0,3.1,59.1],[21,"Chase Brown","RB","CIN",26,3,"45%",226.7,267.0,352.1,56.0,2.7,58.7],[19,"De'Von Achane","RB","MIA",24,3,"68%",235.0,270.0,348.5,57.0,0.7,57.7],[17,"Saquon Barkley","RB","PHI",29,8,"35%",232.8,268.0,369.3,59.0,-1.7,57.3],[23,"Josh Allen","QB","BUF",30,8,"33%",306.9,379.0,439.5,54.0,3.1,57.1],[25,"Trey McBride","TE","ARI",26,4,"46%",235.7,253.0,304.2,52.0,2.8,54.8],[22,"Brock Bowers","TE","LVR",23,2,"81%",235.9,259.0,313.7,54.0,-0.1,53.9],[24,"Omarion Hampton","RB","LAC",23,1,"73%",221.3,254.0,361.1,53.0,0.9,53.9],[27,"Malik Nabers","WR","NYG",23,2,"39%",189.4,243.0,347.2,49.0,3.7,52.7],[28,"Zay Flowers","WR","BAL",25,3,"36%",224.8,253.0,295.6,48.0,3.4,51.4],[29,"Jeremiyah Love","RB","ARI",21,0,"34%",216.2,243.0,354.7,47.0,4.0,51.0],[26,"Derrick Henry","RB","BAL",32,10,"33%",223.1,262.0,333.3,51.0,-2.5,48.5],[33,"Garrett Wilson","WR","NYJ",26,4,"38%",219.2,244.0,299.6,45.0,3.3,48.3],[31,"DeVonta Smith","WR","PHI",27,5,"50%",222.7,242.0,305.0,45.0,2.5,47.5],[30,"Chris Olave","WR","NO",26,4,"75%",216.5,252.0,299.6,47.0,0.3,47.3],[35,"Breece Hall","RB","NYJ",25,4,"43%",214.9,250.0,317.4,44.0,2.8,46.8],[34,"Colston Loveland","TE","CHI",22,1,"60%",197.4,241.0,288.9,44.0,1.7,45.7],[32,"Tee Higgins","WR","CIN",27,6,"66%",217.0,244.0,302.3,45.0,0.3,45.3],[37,"Jaylen Waddle","WR","DEN",27,5,"37%",199.4,235.0,300.3,40.0,3.6,43.6],[38,"Tyler Warren","TE","IND",24,1,"36%",190.3,229.0,265.9,39.0,4.1,43.1],[39,"Javonte Williams","RB","DAL",26,5,"43%",209.1,240.0,305.3,38.0,3.0,41.0],[45,"Christian Watson","WR","GB",27,4,"25%",190.1,226.0,289.7,35.0,4.6,39.6],[43,"Emeka Egbuka","WR","TB",23,1,"42%",193.9,223.0,298.6,36.0,3.1,39.1],[44,"Tetairoa McMillan","WR","CAR",23,1,"37%",200.9,223.0,290.2,35.0,4.1,39.1],[36,"Josh Jacobs","RB","GB",28,7,"67%",188.1,254.0,315.1,42.0,-3.4,38.6],[48,"Ladd McConkey","WR","LAC",24,2,"42%",194.3,221.0,295.9,35.0,3.1,38.1],[42,"Kyren Williams","RB","LAR",25,4,"52%",209.6,233.0,302.8,36.0,1.8,37.8],[46,"Lamar Jackson","QB","BAL",29,8,"42%",298.8,340.0,438.1,35.0,2.7,37.7],[40,"Travis Etienne","RB","NO",27,5,"45%",210.5,229.0,315.8,37.0,0.6,37.6],[47,"Luther Burden III","WR","CHI",22,1,"54%",184.7,223.0,300.4,35.0,1.8,36.8],[52,"Drake Maye","QB","NE",23,2,"35%",295.5,340.0,428.0,32.0,4.4,36.4],[53,"Jayden Daniels","QB","WAS",25,2,"41%",287.4,334.0,434.5,31.0,3.4,34.4],[49,"Terry McLaurin","WR","WAS",30,7,"37%",194.9,219.0,291.2,33.0,1.2,34.2],[55,"Joe Burrow","QB","CIN",29,6,"34%",289.9,337.0,421.3,30.0,3.9,33.9],[56,"Jalen Hurts","QB","PHI",28,6,"33%",288.1,331.0,430.5,30.0,3.9,33.9],[69,"Caleb Williams","QB","CHI",24,2,"20%",278.6,324.0,421.2,27.0,6.8,33.8],[50,"Cameron Skattebo","RB","NYG",24,1,"72%",188.6,230.0,303.5,33.0,0.5,33.5],[57,"Tucker Kraft","TE","GB",25,3,"39%",168.0,200.0,260.0,29.0,4.4,33.4],[59,"Rome Odunze","WR","CHI",24,2,"36%",179.4,206.0,296.9,29.0,4.4,33.4],[41,"Davante Adams","WR","LAR",33,12,"49%",188.9,230.0,290.2,36.0,-2.8,33.2],[72,"Parker Washington","WR","JAC",24,3,"0%",175.5,211.0,270.7,26.0,6.8,32.8],[61,"Jameson Williams","WR","DET",25,4,"36%",184.9,210.0,279.5,28.0,4.3,32.3],[54,"D'Andre Swift","RB","CHI",27,6,"42%",194.5,224.0,292.9,31.0,0.7,31.7],[60,"Bucky Irving","RB","TB",23,2,"63%",180.7,210.0,298.4,29.0,2.3,31.3],[67,"Brock Purdy","QB","SF",26,4,"36%",278.1,327.0,415.5,27.0,4.3,31.3],[65,"Trevor Lawrence","QB","JAC",26,5,"34%",279.9,329.0,414.9,27.0,4.2,31.2],[66,"Justin Herbert","QB","LAC",28,6,"36%",280.7,326.0,417.8,27.0,4.2,31.2],[68,"Quinshon Judkins","RB","CLE",22,1,"48%",181.9,200.0,287.8,27.0,4.1,31.1],[85,"Jadarian Price","RB","SEA",22,0,"29%",145.2,173.0,300.8,23.0,7.7,30.7],[76,"Jaxson Dart","QB","NYG",23,1,"36%",277.1,319.0,417.3,25.0,5.3,30.3],[70,"Kyler Murray","QB","MIN",29,7,"33%",273.0,325.0,419.3,26.0,4.2,30.2],[62,"Harold Fannin Jr.","TE","CLE",22,1,"57%",177.4,197.0,248.3,28.0,2.1,30.1],[63,"Sam LaPorta","TE","DET",25,3,"60%",176.1,196.0,252.4,28.0,2.1,30.1],[77,"Bhayshul Tuten","RB","JAC",23,1,"43%",156.9,182.0,304.6,25.0,4.4,29.4],[51,"Mike Evans","WR","SF",32,12,"65%",182.9,218.0,296.1,32.0,-2.7,29.3],[80,"Carnell Tate","WR","TEN",21,0,"40%",168.5,201.0,280.8,24.0,5.3,29.3],[81,"Bo Nix","QB","DEN",26,2,"28%",280.9,312.0,412.0,23.0,6.1,29.1],[71,"Dak Prescott","QB","DAL",33,10,"34%",282.7,325.0,412.7,26.0,3.0,29.0],[84,"Jonathon Brooks","RB","CAR",23,2,"35%",140.5,176.0,302.0,23.0,5.7,28.7],[73,"TreVeyon Henderson","RB","NE",23,1,"64%",161.9,190.0,304.7,26.0,2.6,28.6],[79,"D.K. Metcalf","WR","PIT",28,7,"36%",174.2,207.0,263.4,24.0,4.5,28.5],[82,"Patrick Mahomes","QB","KC",30,9,"37%",277.7,309.0,416.6,23.0,4.5,27.5],[64,"D.J. Moore","WR","BUF",29,8,"54%",175.9,209.0,282.7,27.0,0.4,27.4],[103,"Tyler Shough","QB","NO",26,1,"17%",270.7,297.0,407.5,19.0,8.2,27.2],[112,"Kyle Monangai","RB","CHI",24,1,"0%",137.4,151.0,264.2,17.0,9.5,26.5],[89,"Jordyn Tyson","WR","NO",22,0,"45%",159.1,194.0,281.3,22.0,4.2,26.2],[99,"Jordan Addison","WR","MIN",24,3,"37%",164.4,196.0,266.2,20.0,6.2,26.2],[95,"Jayden Reed","WR","GB",26,3,"36%",166.3,198.0,265.3,21.0,5.0,26.0],[96,"Brian Thomas Jr.","WR","JAC",23,2,"35%",164.5,189.0,281.7,20.0,5.7,25.7],[97,"Jared Goff","QB","DET",31,10,"23%",278.4,303.0,402.5,20.0,5.0,25.0],[114,"Jacory Croskey-Merritt","RB","WAS",25,1,"30%",122.9,156.0,261.3,17.0,8.0,25.0],[102,"RJ Harvey","RB","DEN",25,1,"36%",136.7,165.0,271.8,19.0,5.9,24.9],[86,"Marvin Harrison Jr.","WR","ARI",24,2,"55%",172.6,196.0,276.6,22.0,2.3,24.3],[88,"Kyle Pitts","TE","ATL",25,5,"53%",170.8,186.0,241.3,22.0,2.1,24.1],[75,"Jaylen Warren","RB","PIT",27,4,"66%",163.7,202.0,274.9,26.0,-2.2,23.8],[129,"Malik Willis","QB","MIA",27,4,"15%",265.2,273.0,407.3,14.0,9.2,23.2],[58,"David Montgomery","RB","HOU",29,7,"85%",182.5,212.0,301.3,29.0,-6.0,23.0],[83,"Rico Dowdle","RB","PIT",28,6,"27%",156.4,182.0,278.3,23.0,0.0,23.0],[74,"Rhamondre Stevenson","RB","NE",28,5,"64%",167.2,199.0,282.6,26.0,-3.1,22.9],[121,"Blake Corum","RB","LAR",25,2,"33%",129.7,141.0,272.0,16.0,6.8,22.8],[91,"Michael Pittman Jr.","WR","PIT",28,6,"60%",173.4,202.0,258.1,21.0,1.7,22.7],[104,"Jakobi Meyers","WR","JAC",29,7,"37%",166.7,194.0,261.6,19.0,3.7,22.7],[137,"Woody Marks","RB","HOU",25,1,"0%",114.1,127.0,243.5,12.0,10.5,22.5],[118,"Tyjae Spears","RB","TEN",25,3,"37%",129.7,154.0,251.6,16.0,6.3,22.3],[98,"J.K. Dobbins","RB","DEN",27,6,"39%",144.9,171.0,269.4,20.0,2.1,22.1],[124,"Xavier Worthy","WR","KC",23,2,"35%",149.9,183.0,268.7,15.0,7.1,22.1],[100,"Josh Downs","WR","IND",25,3,"61%",166.3,193.0,266.9,20.0,2.0,22.0],[108,"Baker Mayfield","QB","TB",31,8,"37%",276.6,291.0,404.8,18.0,3.7,21.7],[136,"C.J. Stroud","QB","HOU",24,3,"29%",267.5,276.0,386.0,12.0,9.6,21.6],[87,"George Kittle","TE","SF",32,9,"44%",132.7,187.0,265.4,22.0,-0.7,21.3],[93,"Courtland Sutton","WR","DEN",30,8,"43%",171.1,199.0,264.5,21.0,0.3,21.3],[106,"Chuba Hubbard","RB","CAR",27,5,"36%",136.8,152.0,288.8,19.0,2.1,21.1],[107,"Jordan Mason","RB","MIN",27,4,"39%",131.6,162.0,268.0,19.0,2.1,21.1],[131,"Zach Charbonnet","RB","SEA",25,3,"37%",99.9,133.0,272.9,14.0,6.8,20.8],[109,"Quentin Johnston","WR","LAC",24,3,"56%",156.5,189.0,271.5,18.0,2.6,20.6],[135,"Makai Lemon","WR","PHI",22,0,"33%",145.3,169.0,280.5,13.0,7.6,20.6],[138,"Jayden Higgins","WR","HOU",23,1,"23%",144.9,173.0,265.7,11.0,9.6,20.6],[143,"KC Concepcion","WR","CLE",21,0,"29%",142.3,176.0,254.8,11.0,9.6,20.6],[130,"Romeo Doubs","WR","NE",26,4,"37%",150.8,180.0,263.9,14.0,6.2,20.2],[132,"Daniel Jones","QB","IND",29,7,"36%",258.0,277.0,402.3,14.0,5.9,19.9],[110,"Chris Godwin","WR","TB",30,9,"40%",151.1,186.0,276.0,18.0,1.7,19.7],[116,"Kenneth Gainwell","RB","TB",27,5,"31%",134.4,151.0,261.2,17.0,2.3,19.3],[142,"Dylan Sampson","RB","CLE",21,1,"34%",110.6,127.0,228.9,11.0,8.2,19.2],[90,"Tony Pollard","RB","TEN",29,7,"35%",155.0,178.0,270.8,22.0,-2.9,19.1],[150,"Chris Rodriguez","RB","JAC",26,3,"27%",98.4,107.0,254.5,9.0,9.8,18.8],[141,"Matthew Golden","WR","GB",23,1,"37%",146.1,164.0,275.9,11.0,7.6,18.6],[122,"Rachaad White","RB","WAS",27,4,"39%",120.8,149.0,259.4,16.0,2.4,18.4],[200,"Jonah Coleman","RB","DEN",22,0,"0%",70.4,78.0,242.4,3.0,14.9,17.9],[134,"Michael Wilson","WR","ARI",26,3,"42%",149.2,178.0,261.1,13.0,4.7,17.7],[151,"Sam Darnold","QB","SEA",29,8,"29%",258.1,261.0,391.1,9.0,8.6,17.6],[179,"Jaydon Blue","RB","DAL",22,1,"22%",75.0,88.0,244.4,5.0,12.4,17.4],[105,"Jordan Love","QB","GB",27,6,"82%",278.4,296.0,402.8,19.0,-1.8,17.2],[145,"Wan'Dale Robinson","WR","TEN",25,4,"36%",153.3,172.0,253.1,10.0,7.0,17.0],[204,"De'Zhaun Stribling","WR","SF",23,0,"0%",129.8,143.0,278.1,3.0,13.9,16.9],[205,"Jalen Coker","WR","CAR",24,2,"18%",136.1,150.0,258.8,3.0,13.9,16.9],[154,"Tyrone Tracy Jr.","RB","NYG",26,2,"34%",97.8,107.0,252.5,9.0,7.7,16.7],[101,"Matthew Stafford","QB","LAR",38,17,"39%",277.8,299.0,403.3,19.0,-2.6,16.4],[174,"Tyler Allgeier","RB","ARI",26,4,"23%",87.4,104.0,212.2,6.0,10.4,16.4],[144,"Cameron Ward","QB","TEN",null,null,"39%",256.0,264.0,401.1,10.0,6.2,16.2],[193,"Fernando Mendoza","QB","LVR",22,0,"23%",235.7,240.0,396.8,4.0,12.2,16.2],[157,"Keaton Mitchell","RB","LAC",24,3,"33%",92.1,107.0,246.3,8.0,8.1,16.1],[155,"Khalil Shakir","WR","BUF",26,4,"35%",152.4,173.0,239.1,9.0,7.0,16.0],[217,"Emmett Johnson","RB","KC",22,0,"18%",62.1,78.0,214.9,1.0,14.9,15.9],[123,"Alec Pierce","WR","IND",26,4,"67%",146.6,188.0,263.1,16.0,-0.4,15.6],[212,"George Holani","RB","SEA",26,2,"0%",70.7,85.0,208.8,2.0,13.3,15.3],[227,"Nicholas Singleton","RB","TEN",22,0,"19%",56.5,65.0,228.6,0.0,14.9,14.9],[119,"Stefon Diggs","WR","WAS",32,11,"31%",150.8,182.0,276.2,16.0,-1.2,14.8],[215,"Mike Washington Jr.","RB","LVR",23,0,"21%",63.0,75.0,221.2,1.0,13.1,14.1],[175,"Bryce Young","QB","CAR",25,3,"32%",244.1,247.0,394.6,5.0,9.0,14.0],[194,"Jalen McMillan","WR","TB",24,2,"39%",130.2,153.0,260.4,4.0,9.5,13.5],[166,"Mark Andrews","TE","BAL",30,8,"36%",143.7,162.0,213.2,7.0,6.3,13.3],[181,"Rashid Shaheed","WR","SEA",27,4,"38%",136.7,159.0,252.7,5.0,8.2,13.2],[117,"Travis Kelce","TE","KC",36,13,"42%",157.8,183.0,220.1,17.0,-4.7,12.3],[245,"Sean Tucker","RB","TB",24,3,"20%",63.0,69.0,195.3,-1.0,13.3,12.3],[236,"Adonai Mitchell","WR","NYJ",23,2,"28%",123.6,140.0,264.1,0.0,12.2,12.2],[246,"Kaytron Allen","RB","WAS",23,0,"24%",55.6,65.0,206.2,-1.0,13.1,12.1],[198,"Jacoby Brissett","QB","ARI",33,10,"10%",234.5,247.0,382.6,3.0,9.0,12.0],[241,"Tre Tucker","WR","LVR",25,3,"0%",126.7,149.0,240.0,-1.0,13.0,12.0],[153,"Isiah Pacheco","RB","DET",27,4,"36%",93.9,116.0,237.7,9.0,2.7,11.7],[133,"Deebo Samuel","WR","SF",30,7,"51%",144.8,174.0,273.8,13.0,-1.6,11.4],[244,"Kenyon Sadiq","TE","NYJ",21,0,"24%",129.5,146.0,205.2,-1.0,12.2,11.2],[192,"Brenton Strange","TE","JAC",25,3,"48%",138.6,159.0,203.9,4.0,6.9,10.9],[218,"Omar Cooper Jr.","WR","NYJ",22,0,"38%",121.1,144.0,266.6,1.0,9.5,10.5],[162,"Dalton Kincaid","TE","BUF",26,3,"62%",141.9,159.0,220.1,7.0,3.1,10.1],[210,"Denzel Boston","WR","CLE",22,0,"42%",130.0,148.0,262.9,2.0,6.9,8.9],[168,"Jake Ferguson","TE","DAL",27,4,"55%",149.9,165.0,199.3,6.0,2.8,8.8],[182,"Brian Robinson Jr.","RB","ATL",27,4,"36%",85.3,100.0,212.7,5.0,3.1,8.1],[226,"Braelon Allen","RB","NYJ",22,2,"42%",67.5,71.0,209.6,0.0,7.6,7.6],[127,"Aaron Jones","RB","MIN",31,9,"65%",117.0,143.0,246.9,14.0,-6.7,7.3],[164,"MarShawn Lloyd","RB","GB",25,2,"72%",76.3,95.0,257.4,7.0,-0.2,6.8],[235,"Juwan Johnson","TE","NO",29,6,"45%",136.8,152.0,194.5,0.0,4.6,4.6],[207,"Geno Smith","QB","NYJ",35,13,"36%",231.6,241.0,390.8,3.0,0.0,3.0],[156,"Alvin Kamara","RB","NO",31,9,"39%",90.1,111.0,239.0,8.0,-5.3,2.7],[211,"Isaiah Likely","TE","NYG",26,4,"73%",141.1,153.0,204.0,2.0,-0.3,1.7],[206,"Justice Hill","RB","BAL",28,7,"32%",86.1,96.0,191.4,3.0,-1.9,1.1],[165,"Dallas Goedert","TE","PHI",31,8,"83%",144.2,164.0,208.2,7.0,-6.4,0.6],[160,"Aaron Rodgers","QB","PIT",42,21,"53%",252.9,258.0,384.5,7.0,-7.8,-0.8],[240,"Hunter Henry","TE","NE",31,10,"47%",133.3,150.0,197.7,-1.0,-0.9,-1.9],[234,"James Conner","RB","ARI",31,9,"34%",71.8,87.0,173.1,0.0,-6.2,-6.2],[247,"Keenan Allen","WR","UNS",33,13,"49%",114.5,153.0,236.6,-1.0,-5.9,-6.9]];
+const COLS = [
+  { key: 0,  label: 'Rk',      cls: 'col-rank' },
+  { key: 1,  label: 'Player',   cls: 'col-name' },
+  { key: 2,  label: 'Pos',      cls: 'col-pos' },
+  { key: 3,  label: 'Team',     cls: 'col-team' },
+  { key: 4,  label: 'Age',      cls: '' },
+  { key: 5,  label: 'Exp',      cls: '' },
+  { key: 6,  label: 'Injury',   cls: 'col-injury' },
+  { key: 7,  label: 'Floor',    cls: '' },
+  { key: 8,  label: 'DS Proj',  cls: '' },
+  { key: 9,  label: 'Ceiling',  cls: '' },
+  { key: 10, label: '3D Val',   cls: '' },
+  { key: 11, label: 'Keeper Δ', cls: 'col-change' },
+  { key: 12, label: 'Adjusted', cls: 'col-adjusted' },
+];
+
+let sortCol = 12;
+let sortDir = -1; // -1 = desc
+let posFilter = 'ALL';
+let selectedRounds = new Set(); // empty = show all
+
+function parseNum(v) {
+  if (v == null) return -Infinity;
+  if (typeof v === 'number') return v;
+  return parseFloat(String(v).replace('%', '')) || 0;
+}
+
+function sortData() {
+  const col = sortCol;
+  D.sort((a, b) => {
+    let va = a[col], vb = b[col];
+    if (typeof va === 'string' && typeof vb === 'string') {
+      return sortDir * va.localeCompare(vb);
+    }
+    return sortDir * (parseNum(va) - parseNum(vb));
+  });
+}
+
+function renderHeader() {
+  const tr = document.getElementById('header-row');
+  tr.innerHTML = '';
+  COLS.forEach((c, i) => {
+    const th = document.createElement('th');
+    th.className = c.cls + (sortCol === c.key ? ' sorted' : '');
+    const arrow = sortCol === c.key ? (sortDir === 1 ? '▲' : '▼') : '⇅';
+    th.innerHTML = c.label + '<span class="sort-arrow">' + arrow + '</span>';
+    th.addEventListener('click', () => {
+      if (sortCol === c.key) sortDir *= -1;
+      else { sortCol = c.key; sortDir = (c.key <= 3 || c.key === 6) ? 1 : -1; }
+      render();
+    });
+    tr.appendChild(th);
+  });
+}
+
+function fmtChange(v) {
+  if (v == null) return '';
+  return (v >= 0 ? '+' : '') + v.toFixed(1);
+}
+
+const maxAbsChange = Math.max(...D.map(r => Math.abs(r[11] || 0)));
+
+function renderBody() {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+  const filtered = D.filter(r => {
+    if (posFilter !== 'ALL' && r[2] !== posFilter) return false;
+    if (selectedRounds.size > 0) {
+      const playerRound = Math.ceil(r[0] / 12);
+      if (!selectedRounds.has(playerRound)) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('filter-count').textContent = filtered.length + ' players';
+
+  filtered.forEach(r => {
+    const tr = document.createElement('tr');
+    const chg = r[11] || 0;
+    if (chg > 8) tr.className = 'highlight';
+
+    COLS.forEach(c => {
+      const td = document.createElement('td');
+      td.className = c.cls;
+      const v = r[c.key];
+
+      if (c.key === 2) {
+        td.innerHTML = '<span class="' + v + '">' + v + '</span>';
+      } else if (c.key === 11) {
+        td.classList.add(chg >= 0 ? 'pos' : 'neg');
+        td.classList.add('bar-cell');
+        const pct = Math.min(100, (Math.abs(chg) / maxAbsChange) * 100);
+        const barCls = chg >= 0 ? 'pos-bar' : 'neg-bar';
+        td.innerHTML = '<span class="bar ' + barCls + '" style="width:' + pct + '%"></span><span class="val">' + fmtChange(chg) + '</span>';
+      } else if (c.key === 12) {
+        td.textContent = v != null ? v.toFixed(1) : '';
+        td.style.color = chg >= 5 ? 'var(--positive)' : chg <= -5 ? 'var(--negative)' : '';
+      } else if (typeof v === 'number' && c.key >= 7 && c.key <= 10) {
+        td.textContent = v.toFixed(1);
+      } else {
+        td.textContent = v != null ? v : '';
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function render() {
+  sortData();
+  renderHeader();
+  renderBody();
+}
+
+document.querySelectorAll('.chip[data-pos]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.chip[data-pos]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    posFilter = btn.dataset.pos;
+    render();
+  });
+});
+
+// Build round chips
+const maxRound = Math.ceil(Math.max(...D.map(r => r[0])) / 12);
+const rcContainer = document.getElementById('round-chips');
+for (let rd = 1; rd <= maxRound; rd++) {
+  const btn = document.createElement('button');
+  btn.className = 'round-chip';
+  btn.textContent = rd;
+  btn.dataset.round = rd;
+  btn.addEventListener('click', () => {
+    const r = parseInt(btn.dataset.round, 10);
+    if (selectedRounds.has(r)) {
+      selectedRounds.delete(r);
+      btn.classList.remove('active');
+    } else {
+      selectedRounds.add(r);
+      btn.classList.add('active');
+    }
+    render();
+  });
+  rcContainer.appendChild(btn);
+}
+
+render();
+</script>

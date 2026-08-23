@@ -114,78 +114,33 @@ def load_base_ranking(path, rank_field):
     return [[int(r[rank_field]), r['name'], r['pos']] for r in rows]
 
 
-def build_comp_data(data, keepers, ext_path, rank_field):
-    """Build comparison data between a base ranking and an external ranking source."""
-    keeper_set = {k['name'] for k in keepers}
-    ds_by_name = {row[1]: row for row in data}
-
-    try:
-        with open(ext_path) as f:
-            ext_players = list(csv.DictReader(f))
-    except FileNotFoundError:
-        return []
-
-    ext_by_name = {}
-    for ep in ext_players:
-        ds_name = ALIAS_TO_DS.get(ep['name'], ep['name'])
-        ext_by_name[ds_name] = int(ep[rank_field])
-
-    ds_keeper_info = []
-    ext_keeper_info = []
-    for row in data:
-        if row[1] in keeper_set:
-            k = next(ki for ki in keepers if ki['name'] == row[1])
-            overall_pick = (k['round'] - 1) * TEAMS + k['pick']
-            ds_keeper_info.append({
-                'origRank': row[0],
-                'overallPick': overall_pick
-            })
-            ext_rank = ext_by_name.get(row[1], row[0])
-            ext_keeper_info.append({
-                'origRank': ext_rank,
-                'overallPick': overall_pick
-            })
-
-    def adj_ds(orig):
-        return orig - sum(1 for k in ds_keeper_info
-                          if k['origRank'] < orig and k['overallPick'] > orig)
-
-    def adj_ext(rank):
-        return rank - sum(1 for k in ext_keeper_info
-                          if k['origRank'] < rank and k['overallPick'] > rank)
-
-    comp = []
-    for ep in ext_players:
-        ds_name = ALIAS_TO_DS.get(ep['name'], ep['name'])
-        ext_rank = int(ep[rank_field])
-        if ds_name not in ds_by_name or ds_name in keeper_set:
-            continue
-        ds_rank = ds_by_name[ds_name][0]
-        ds_adj = adj_ds(ds_rank)
-        ext_adj = adj_ext(ext_rank)
-        pos = ds_by_name[ds_name][2]
-        if ext_adj > 155 and ds_adj > 155:
-            continue
-        comp.append([ds_name, pos, ds_adj, ext_adj, ds_rank, ext_rank])
-
-    comp.sort(key=lambda x: x[3])
-    return comp
+def build_offense_ranks(data):
+    """Build offense-only sequential rank array [[name, pos, rank], ...] from any data."""
+    OFFENSE = {'QB', 'RB', 'WR', 'TE'}
+    rows = sorted([r for r in data if r[2] in OFFENSE], key=lambda r: r[0])
+    return [[r[1], r[2], i + 1] for i, r in enumerate(rows)]
 
 
-def update_html(data, keepers, comp, comp_fp, comp_boone, comp_boone_fp,
-                comp_ciely, comp_ciely_fp, boone_data, ciely_data):
+def load_ext_ranks(path, rank_field):
+    """Load an external CSV and return offense-only sequential ranks."""
+    with open(path) as f:
+        rows = list(csv.DictReader(f))
+    rows.sort(key=lambda r: int(r[rank_field]))
+    result = []
+    for i, r in enumerate(rows):
+        name = ALIAS_TO_DS.get(r['name'], r['name'])
+        result.append([name, r['pos'], i + 1])
+    return result
+
+
+def update_html(data, keepers, boone_data, ciely_data, ranks):
     with open(HTML_PATH) as f:
         html = f.read()
 
     blocks = {
         'DATA': 'const DATA=' + json.dumps(data, separators=(',', ':')) + ';',
         'KEEPERS': 'const KEEPERS=' + json.dumps(keepers, separators=(',', ':')) + ';',
-        'COMP': 'const COMP=' + json.dumps(comp, separators=(',', ':')) + ';',
-        'COMP_FP': 'const COMP_FP=' + json.dumps(comp_fp, separators=(',', ':')) + ';',
-        'COMP_BOONE': 'const COMP_BOONE=' + json.dumps(comp_boone, separators=(',', ':')) + ';',
-        'COMP_BOONE_FP': 'const COMP_BOONE_FP=' + json.dumps(comp_boone_fp, separators=(',', ':')) + ';',
-        'COMP_CIELY': 'const COMP_CIELY=' + json.dumps(comp_ciely, separators=(',', ':')) + ';',
-        'COMP_CIELY_FP': 'const COMP_CIELY_FP=' + json.dumps(comp_ciely_fp, separators=(',', ':')) + ';',
+        'RANKS': 'const RANKS=' + json.dumps(ranks, separators=(',', ':')) + ';',
         'DATA_BOONE': 'const DATA_BOONE=' + json.dumps(boone_data, separators=(',', ':')) + ';',
         'DATA_CIELY': 'const DATA_CIELY=' + json.dumps(ciely_data, separators=(',', ':')) + ';',
     }
@@ -211,22 +166,21 @@ def main():
     print(f"Loaded {len(players)} players, {len(keepers)} keepers\n")
 
     results = compute_adjusted_ranks(data, keepers)
-    comp = build_comp_data(data, keepers, ESPN_PATH, 'espn_ppr_rank')
-    comp_fp = build_comp_data(data, keepers, FP_PATH, 'fp_ppr_rank')
 
     boone_data = load_base_ranking(BOONE_PATH, 'boone_ppr_rank')
-    comp_boone = build_comp_data(boone_data, keepers, ESPN_PATH, 'espn_ppr_rank')
-    comp_boone_fp = build_comp_data(boone_data, keepers, FP_PATH, 'fp_ppr_rank')
-
     ciely_data = load_base_ranking(CIELY_PATH, 'fpx_ppr_rank')
-    comp_ciely = build_comp_data(ciely_data, keepers, ESPN_PATH, 'espn_ppr_rank')
-    comp_ciely_fp = build_comp_data(ciely_data, keepers, FP_PATH, 'fp_ppr_rank')
 
-    update_html(data, keepers, comp, comp_fp, comp_boone, comp_boone_fp,
-                comp_ciely, comp_ciely_fp, boone_data, ciely_data)
-    print(f"Comparison data: DS({len(comp)} ESPN, {len(comp_fp)} FP) "
-          f"Boone({len(comp_boone)} ESPN, {len(comp_boone_fp)} FP) "
-          f"Ciely({len(comp_ciely)} ESPN, {len(comp_ciely_fp)} FP)")
+    ranks = {
+        'ds': build_offense_ranks(data),
+        'boone': build_offense_ranks(boone_data),
+        'ciely': build_offense_ranks(ciely_data),
+        'espn': load_ext_ranks(ESPN_PATH, 'espn_ppr_rank'),
+        'fp': load_ext_ranks(FP_PATH, 'fp_ppr_rank'),
+    }
+
+    update_html(data, keepers, boone_data, ciely_data, ranks)
+    for key, arr in ranks.items():
+        print(f"  {key}: {len(arr)} players")
     print(f"Updated {HTML_PATH}\n")
 
     print(f"{'Name':<28} {'Pos':<4} {'Rank':>4} {'Adj':>4} {'Δ':>3}")

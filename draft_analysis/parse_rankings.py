@@ -162,7 +162,7 @@ def load_sleeper_data() -> dict[str, dict]:
     lookup = {}
     for pid, p in data.items():
         name = p.get('full_name')
-        if name and p.get('position') in ('QB', 'RB', 'WR', 'TE'):
+        if name and p.get('position') in ('QB', 'RB', 'WR', 'TE', 'K', 'DEF'):
             lookup[name] = {
                 'age': p.get('age'),
                 'years_exp': p.get('years_exp'),
@@ -215,17 +215,20 @@ def enrich_with_age(players: list[dict], sleeper: dict[str, dict]) -> int:
 def main():
     print("Fetching PPR rankings...")
     default_html = fetch_html('')
-    all_players = parse_player_blocks(default_html, {'QB', 'RB', 'WR', 'TE'})
-    print(f"  Got {len(all_players)} offensive players")
+    IDP_POSITIONS = {'LB', 'DL', 'DB'}
+    all_players = parse_player_blocks(default_html)
+    all_players = [p for p in all_players if p['position'] not in IDP_POSITIONS]
+    print(f"  Got {len(all_players)} players (excluding IDP)")
 
-    # Sort by overall rank, keep top 200, then re-rank sequentially
-    # (the default endpoint includes K/DST which create gaps in offensive ranks)
+    # Sort by overall rank, re-rank after IDP removal
+    # IDP isn't drafted — their rank slots inflate everyone below them
+    # K/DEF ARE drafted so they keep their (now compressed) rank positions
     all_players.sort(key=lambda p: p['rank'])
-    all_players = all_players[:200]
-    for i, p in enumerate(all_players, 1):
-        p['rank'] = i
+    for i, p in enumerate(all_players):
+        p['rank'] = i + 1
+    all_players = all_players[:250]
 
-    print(f"\nTotal: {len(all_players)} players (top 200, offensive only)")
+    print(f"\nTotal: {len(all_players)} players")
     pos_counts = {}
     for p in all_players:
         pos_counts[p['position']] = pos_counts.get(p['position'], 0) + 1

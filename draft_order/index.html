@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Esben's Incredible Draft Order Decider</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --text: #f1f5f9;
+    --accent: #facc15;
+    --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #1e293b, #0f172a 70%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 64px;
+  }
+  h1 {
+    margin: 0 0 48px;
+    font-size: clamp(1.5rem, 4vw, 2.2rem);
+    text-align: center;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 36px;
+    width: 100%;
+    max-width: 900px;
+  }
+  .wheel-area {
+    grid-column: 2;
+    justify-self: center;
+  }
+  .results {
+    grid-column: 3;
+    justify-self: start;
+  }
+  @media (max-width: 700px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+    .wheel-area,
+    .results {
+      grid-column: 1;
+      justify-self: center;
+    }
+  }
+  .wheel-area {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  .wheel-wrap {
+    position: relative;
+    width: min(420px, 88vw);
+    height: min(420px, 88vw);
+  }
+  .pointer {
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 16px solid transparent;
+    border-right: 16px solid transparent;
+    border-top: 28px solid var(--accent);
+    z-index: 5;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+  }
+  canvas#wheel {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: block;
+    box-shadow: 0 0 0 6px #334155, 0 0 40px rgba(0,0,0,0.5);
+    transition: transform 4.5s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+  }
+  .hub {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 18%;
+    height: 18%;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px #0f172a, 0 2px 8px rgba(0,0,0,0.5);
+    z-index: 4;
+  }
+  button {
+    font-size: 1.05rem;
+    font-weight: 600;
+    padding: 12px 28px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    background: var(--accent);
+    color: #1e293b;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+  button:hover:not(:disabled) { transform: translateY(-2px); }
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .controls {
+    display: flex;
+    gap: 12px;
+  }
+  .results {
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 28px 36px;
+    width: min(320px, 90vw);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  ul#order-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+  }
+  ul#order-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 1.05rem;
+    color: var(--muted);
+  }
+  ul#order-list li .slot-num {
+    width: 22px;
+    text-align: right;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  ul#order-list li .slot-name::before {
+    content: "\2014";
+  }
+  ul#order-list li.filled {
+    color: var(--text);
+    animation: pop 0.35s ease;
+  }
+  ul#order-list li.filled .slot-name {
+    font-weight: 700;
+  }
+  ul#order-list li.filled .slot-name::before {
+    content: "";
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+</style>
+</head>
+<body>
+
+  <h1>🏈 Esben's Incredible Draft Order Decider</h1>
+
+  <div class="layout">
+    <div class="wheel-area">
+      <div class="wheel-wrap">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="600" height="600"></canvas>
+        <div class="hub"></div>
+      </div>
+      <div class="controls">
+        <button id="spin-btn">Spin</button>
+      </div>
+    </div>
+
+    <div class="results">
+      <ul id="order-list"></ul>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const ALL_TEAMS = [
+    "Esben", "Tyler", "Ben", "Adam", "Harry", "Edu",
+    "Jonah", "Andrew", "Evan", "Devan", "Parker", "Grant"
+  ];
+
+  const COLORS = [
+    "#ef4444", "#f97316", "#f59e0b", "#eab308",
+    "#84cc16", "#22c55e", "#10b981", "#14b8a6",
+    "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899"
+  ];
+
+  const canvas = document.getElementById("wheel");
+  const ctx = canvas.getContext("2d");
+  const spinBtn = document.getElementById("spin-btn");
+  const orderList = document.getElementById("order-list");
+
+  let remaining = [...ALL_TEAMS];
+  let colorMap = new Map(ALL_TEAMS.map((t, i) => [t, COLORS[i]]));
+  let currentRotation = 0; // degrees, cumulative
+  let spinning = false;
+  let nextPick = ALL_TEAMS.length; // counts down: 12, 11, ..., 1
+
+  // True random seed each spin, sourced from crypto when available.
+  function randomFloat() {
+    if (window.crypto && window.crypto.getRandomValues) {
+      const buf = new Uint32Array(1);
+      window.crypto.getRandomValues(buf);
+      return buf[0] / 4294967296;
+    }
+    return Math.random();
+  }
+
+  function drawWheel() {
+    const size = canvas.width;
+    const cx = size / 2;
+    const cy = size / 2;
+    const radius = size / 2 - 4;
+    const n = remaining.length;
+
+    ctx.clearRect(0, 0, size, size);
+
+    if (n === 0) {
+      ctx.fillStyle = "#334155";
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#f1f5f9";
+      ctx.font = "bold 28px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Done!", cx, cy);
+      return;
+    }
+
+    const sliceAngle = (2 * Math.PI) / n;
+
+    for (let i = 0; i < n; i++) {
+      const start = i * sliceAngle;
+      const end = start + sliceAngle;
+      const team = remaining[i];
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius, start, end);
+      ctx.closePath();
+      ctx.fillStyle = colorMap.get(team);
+      ctx.fill();
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Label
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(start + sliceAngle / 2);
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 22px sans-serif";
+      ctx.fillText(team, radius - 18, 0);
+      ctx.restore();
+    }
+  }
+
+  function spin() {
+    if (spinning || remaining.length === 0) return;
+    spinning = true;
+    spinBtn.disabled = true;
+
+    const n = remaining.length;
+    const sliceDeg = 360 / n;
+
+    // Pick winner index uniformly at random with a fresh random seed each time.
+    const winnerIndex = Math.floor(randomFloat() * n);
+
+    // The pointer is fixed at the top (12 o'clock = -90deg / 270deg from 0).
+    // Slice i spans [i*sliceDeg, (i+1)*sliceDeg) starting at angle 0 = 3 o'clock,
+    // drawn clockwise. We need the wheel's rotation so that the winner slice's
+    // midpoint lands under the pointer (top, i.e. -90deg in canvas terms, but
+    // since we rotate the whole element clockwise via CSS, compute accordingly).
+    const winnerMid = winnerIndex * sliceDeg + sliceDeg / 2;
+    // Canvas 0deg is at 3 o'clock; pointer is at 12 o'clock (i.e. -90deg / 270deg).
+    // We want: (currentVisualAngleOfWinnerMid + rotationApplied) mod 360 === 270
+    const targetOffset = (270 - winnerMid + 360) % 360;
+
+    // Add multiple full spins for effect, with a fresh random seed each time.
+    const extraSpins = 5 + Math.floor(randomFloat() * 4); // 5-8 full turns
+    const randomJitter = (randomFloat() - 0.5) * (sliceDeg * 0.6); // stay within slice
+
+    const newRotation = currentRotation - (currentRotation % 360) // normalize base
+      + extraSpins * 360 + targetOffset + randomJitter;
+
+    // Ensure monotonically increasing rotation so it always spins forward
+    const delta = newRotation - currentRotation;
+    const finalRotation = currentRotation + (delta > 0 ? delta : delta + 360 * extraSpins);
+
+    currentRotation = finalRotation;
+    canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+    const onDone = () => {
+      canvas.removeEventListener("transitionend", onDone);
+      const winner = remaining[winnerIndex];
+      addToOrder(winner);
+      remaining.splice(winnerIndex, 1);
+      spinning = false;
+
+      // Only one team left: no point spinning for it, just place it.
+      if (remaining.length === 1) {
+        addToOrder(remaining[0]);
+        remaining = [];
+      }
+
+      drawWheel();
+      spinBtn.disabled = remaining.length === 0;
+    };
+    canvas.addEventListener("transitionend", onDone);
+  }
+
+  function buildSlots() {
+    orderList.innerHTML = "";
+    for (let n = ALL_TEAMS.length; n >= 1; n--) {
+      const li = document.createElement("li");
+      li.dataset.slot = n;
+      li.innerHTML = `<span class="slot-num">${n}.</span><span class="slot-name"></span>`;
+      orderList.appendChild(li);
+    }
+  }
+
+  function addToOrder(team) {
+    const li = orderList.querySelector(`li[data-slot="${nextPick}"]`);
+    li.classList.add("filled");
+    li.style.color = colorMap.get(team);
+    li.querySelector(".slot-name").textContent = team;
+    nextPick -= 1;
+  }
+
+  spinBtn.addEventListener("click", spin);
+
+  buildSlots();
+  drawWheel();
+})();
+</script>
+</body>
+</html>
