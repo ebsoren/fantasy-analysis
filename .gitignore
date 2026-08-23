@@ -1,2 +1,4 @@
 espnsecrets.py
 __pycache__/
+*.db
+.DS_Store
