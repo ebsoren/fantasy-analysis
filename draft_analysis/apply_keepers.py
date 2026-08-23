@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Apply keeper adjustments and regenerate draft_board.html data.
+"""Apply keeper adjustments and regenerate index.html data.
 
 Reads ppr_rankings.csv + keepers.json, computes adjusted ranks,
-and rewrites the DATA and KEEPERS blocks in draft_board.html.
+and rewrites the DATA and KEEPERS blocks in index.html.
 
 Usage:
     python apply_keepers.py
@@ -15,7 +15,6 @@ Pipeline:
 
 import csv
 import json
-import math
 import re
 
 BASE_DIR = '/Users/esbensorensen/code/fantasy/draft_analysis'

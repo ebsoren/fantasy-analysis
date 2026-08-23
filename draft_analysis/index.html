@@ -1065,7 +1065,7 @@ function drawCombinedChart() {
     rawItems.sort((a, b) => a.espnAdj - b.espnAdj);
     const usedRanks3 = new Set(rawItems.map(it => it.espnAdj));
     const maxRank3 = rawItems.length > 0 ? rawItems[rawItems.length - 1].espnAdj : 0;
-    var items = [];
+    let items = [];
     let ri3 = 0;
     for (let rank = 1; rank <= maxRank3; rank++) {
       if (ri3 < rawItems.length && rawItems[ri3].espnAdj === rank) {
@@ -1081,7 +1081,7 @@ function drawCombinedChart() {
     while (ri3 < rawItems.length) items.push(rawItems[ri3++]);
   } else {
     rawItems.sort((a, b) => b.val - a.val);
-    var items = rawItems;
+    let items = rawItems;
   }
 
   const W = Math.min(900, container.clientWidth - 32);
@@ -1160,8 +1160,6 @@ function drawCombinedChart() {
       }
       prevRound = curRound;
     }
-    // Label first round
-    const firstMid = sx(0);
     ctx.fillText('R' + (Math.floor((items[0].espnAdj - 1) / TEAMS) + 1), pad.l + 12, pad.t - 4);
     ctx.setLineDash([]);
   }
@@ -1254,9 +1252,7 @@ function updateCompTitles() {
 function redrawComps() {
   updateCompTitles();
   drawCompChart();
-  setupCompHover();
   drawCombinedChart();
-  setupCombinedHover();
 }
 
 document.querySelectorAll('.comp-base').forEach(btn => {
@@ -1267,7 +1263,7 @@ document.querySelectorAll('.comp-base').forEach(btn => {
     rebuildKeeperInfo();
     renderBoard();
     if (document.querySelector('.tab[data-tab="analytics"]').classList.contains('active')) {
-      drawChart(); setupChartHover();
+      drawChart();
     }
   });
 });
@@ -1298,7 +1294,6 @@ document.querySelectorAll('#sortCombined, #sortSrcRank').forEach(btn => {
     btn.classList.add('active');
     combinedSort = btn.dataset.sort;
     drawCombinedChart();
-    setupCombinedHover();
   });
 });
 
@@ -1308,20 +1303,17 @@ document.querySelectorAll('.comb-pos').forEach(btn => {
     btn.classList.add('active');
     combinedPos = btn.dataset.cpos;
     drawCombinedChart();
-    setupCombinedHover();
   });
 });
 
 document.getElementById('pickSpot').addEventListener('change', function() {
   combinedPick = parseInt(this.value);
   drawCombinedChart();
-  setupCombinedHover();
 });
 
 document.getElementById('roundFilter').addEventListener('change', function() {
   combinedRound = parseInt(this.value);
   drawCombinedChart();
-  setupCombinedHover();
 });
 
 /* ── Events ── */
@@ -1379,14 +1371,14 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById(tab.dataset.tab + '-panel').classList.add('active');
     if (tab.dataset.tab === 'analytics') {
       drawChart();
-      setupChartHover();
       drawCompChart();
-      setupCompHover();
       drawCombinedChart();
-      setupCombinedHover();
     }
   });
 });
 
 renderBoard();
+setupChartHover();
+setupCompHover();
+setupCombinedHover();
 </script>

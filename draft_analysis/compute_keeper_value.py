@@ -20,7 +20,7 @@ The model captures three things the user specified:
 import csv
 import math
 
-LEAGUE_SIZE = 12
+TEAMS = 12
 MAX_ROUNDS = 16
 
 
@@ -134,7 +134,7 @@ def compute_value_change(player: dict) -> float:
     injury_str = player['injury_risk'] if player['injury_risk'] else '40%'
 
     # What round this player is worth (by overall rank)
-    value_round = min(MAX_ROUNDS, max(1, math.ceil(rank / LEAGUE_SIZE)))
+    value_round = min(MAX_ROUNDS, max(1, math.ceil(rank / TEAMS)))
 
     # ── Runway premium ──
     # Right-tail: later round = more keeper years = more premium.

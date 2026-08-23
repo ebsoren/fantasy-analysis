@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """Parse DraftSharks PPR rankings HTML into a SQLite database.
-Fetches age/experience from Pro Football Reference."""
+Fetches age/experience from the Sleeper API."""
 
 import re
 import sqlite3
 import csv
 import subprocess
 import json
-import time
 
 
-def parse_player_blocks(html: str, positions_filter: set | None = None) -> list[dict]:
+def parse_player_blocks(html: str) -> list[dict]:
     """Extract player data from the DraftSharks table HTML."""
     players = []
     blocks = re.split(r'<tbody\s+data-player-row', html)
@@ -25,9 +24,6 @@ def parse_player_blocks(html: str, positions_filter: set | None = None) -> list[
 
         m = re.search(r'data-fantasy-position="([^"]+)"', block)
         player['position'] = m.group(1) if m else ''
-
-        if positions_filter and player['position'] not in positions_filter:
-            continue
 
         m = re.search(r'<span class="player-details-group__team-name">([^<]+)</span>', block)
         player['team'] = m.group(1).strip() if m else ''
