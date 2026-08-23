@@ -26,6 +26,7 @@ BOONE_PATH = f'{BASE_DIR}/boone_rankings.csv'
 CIELY_PATH = f'{BASE_DIR}/fpx_rankings.csv'
 KEEPERS_PATH = f'{BASE_DIR}/keepers.json'
 HTML_PATH = f'{BASE_DIR}/index.html'
+ROOT_HTML_PATH = f'{BASE_DIR}/../index.html'
 
 TEAMS = 12
 
@@ -195,8 +196,9 @@ def update_html(data, keepers, comp, comp_fp, comp_boone, comp_boone_fp,
             flags=re.DOTALL
         )
 
-    with open(HTML_PATH, 'w') as f:
-        f.write(html)
+    for path in (HTML_PATH, ROOT_HTML_PATH):
+        with open(path, 'w') as f:
+            f.write(html)
 
 
 def main():
