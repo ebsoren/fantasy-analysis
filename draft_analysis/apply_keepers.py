@@ -72,7 +72,8 @@ def build_data_array(players):
             r['ceiling_proj'],
             r['three_d_value'],
             r['age'],
-            r['years_in_nfl']
+            r['years_in_nfl'],
+            r.get('nfl_draft_round', '')
         ])
     return data
 

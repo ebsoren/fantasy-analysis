@@ -110,7 +110,8 @@ def create_database(players: list[dict], db_path: str):
             tier_overall INTEGER,
             tier_positional INTEGER,
             age INTEGER,
-            years_in_nfl INTEGER
+            years_in_nfl INTEGER,
+            nfl_draft_round INTEGER
         )
     ''')
 
@@ -118,8 +119,9 @@ def create_database(players: list[dict], db_path: str):
         c.execute('''
             INSERT INTO players (rank, name, position, team, games, adp, bye, sos,
                 injury_risk, floor_proj, consensus_proj, ds_proj, ceiling_proj,
-                three_d_value, tier_overall, tier_positional, age, years_in_nfl)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                three_d_value, tier_overall, tier_positional, age, years_in_nfl,
+                nfl_draft_round)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             p['rank'], p['name'], p['position'], p['team'],
             safe_int(p['games']), safe_float(p['adp']),
@@ -129,6 +131,7 @@ def create_database(players: list[dict], db_path: str):
             safe_float(p['three_d_value']),
             safe_int(p['tier_overall']), safe_int(p['tier_positional']),
             p.get('age'), p.get('years_in_nfl'),
+            safe_int(p.get('nfl_draft_round')),
         ))
 
     conn.commit()
@@ -139,7 +142,8 @@ def write_csv(players: list[dict], csv_path: str):
     """Also write a CSV."""
     fields = ['rank', 'name', 'position', 'team', 'games', 'adp', 'bye', 'sos',
               'injury_risk', 'floor_proj', 'consensus_proj', 'ds_proj', 'ceiling_proj',
-              'three_d_value', 'tier_overall', 'tier_positional', 'age', 'years_in_nfl']
+              'three_d_value', 'tier_overall', 'tier_positional', 'age', 'years_in_nfl',
+              'nfl_draft_round']
     with open(csv_path, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
         writer.writeheader()
@@ -183,9 +187,31 @@ ALIASES = {
 }
 
 
-def enrich_with_age(players: list[dict], sleeper: dict[str, dict]) -> int:
-    """Add age and years_in_nfl from Sleeper data. Returns count of matches."""
-    # Build normalized lookup
+def load_nfl_draft_rounds() -> dict[str, int]:
+    """Fetch NFL draft round for active players from nflverse."""
+    print("Fetching NFL draft rounds from nflverse...")
+    url = 'https://github.com/nflverse/nflverse-data/releases/download/draft_picks/draft_picks.csv'
+    result = subprocess.run(
+        ['curl', '-sL', url, '-H', 'User-Agent: Mozilla/5.0'],
+        capture_output=True, text=True, timeout=30
+    )
+    lookup = {}
+    reader = csv.DictReader(result.stdout.splitlines())
+    for row in reader:
+        name = row.get('pfr_player_name', '')
+        rd = row.get('round', '')
+        if name and rd:
+            lookup[name] = int(rd)
+    norm_lookup = {}
+    for name, rd in lookup.items():
+        norm_lookup[normalize_name(name)] = rd
+    print(f"  Loaded {len(lookup)} draft picks")
+    return lookup, norm_lookup
+
+
+def enrich_with_age(players: list[dict], sleeper: dict[str, dict],
+                    draft_rounds: dict[str, int], draft_rounds_norm: dict[str, int]) -> int:
+    """Add age, years_in_nfl, nfl_draft_round from Sleeper + nflverse data. Returns count of matches."""
     norm_lookup = {}
     for name, info in sleeper.items():
         norm_lookup[normalize_name(name)] = info
@@ -205,6 +231,14 @@ def enrich_with_age(players: list[dict], sleeper: dict[str, dict]) -> int:
         else:
             p['age'] = None
             p['years_in_nfl'] = None
+
+        dr = draft_rounds.get(p['name'])
+        if not dr:
+            alias = ALIASES.get(p['name'], p['name'])
+            dr = draft_rounds.get(alias)
+        if not dr:
+            dr = draft_rounds_norm.get(normalize_name(p['name']))
+        p['nfl_draft_round'] = dr
     return matched
 
 
@@ -230,9 +264,9 @@ def main():
         pos_counts[p['position']] = pos_counts.get(p['position'], 0) + 1
     print(f"Position breakdown: {pos_counts}")
 
-    # Enrich with age/experience
     sleeper = load_sleeper_data()
-    matched = enrich_with_age(all_players, sleeper)
+    draft_rounds, draft_rounds_norm = load_nfl_draft_rounds()
+    matched = enrich_with_age(all_players, sleeper, draft_rounds, draft_rounds_norm)
     unmatched = [p['name'] for p in all_players if p['age'] is None]
     print(f"  Matched {matched}/{len(all_players)} players")
     if unmatched:
